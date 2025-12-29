@@ -17,6 +17,7 @@ import { Toaster } from '@/components/ui/toaster';
 import { AuthProvider, useAuth } from '@/contexts/SupabaseAuthContext';
 import { CartProvider } from '@/hooks/useCart';
 import { SubscriptionProvider } from '@/hooks/useSubscription';
+import { GeolocationProvider } from '@/contexts/GeolocationContext';
 import { Loader2, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -29,15 +30,15 @@ const RouteDebug = ({ children }) => {
 // Protected Route Wrapper for Users
 const UserRoute = ({ children }) => {
   const { session, loading } = useAuth();
-  
+
   if (loading) {
     return (
-        <div className="flex h-screen w-full items-center justify-center bg-slate-950">
-            <Loader2 className="h-8 w-8 animate-spin text-indigo-500" />
-        </div>
+      <div className="flex h-screen w-full items-center justify-center bg-slate-950">
+        <Loader2 className="h-8 w-8 animate-spin text-indigo-500" />
+      </div>
     );
   }
-  
+
   return session ? children : <Navigate to="/login" />;
 };
 
@@ -64,13 +65,13 @@ function AppRoutes() {
   useEffect(() => {
     // Stop spinner immediately when auth is ready
     if (!loading) {
-        setShowSpinner(false);
-        return;
+      setShowSpinner(false);
+      return;
     }
 
     // Safety timeout 1: Show "taking longer" message after 3s
     const longLoadTimer = setTimeout(() => {
-        if(loading) setLongLoad(true);
+      if (loading) setLongLoad(true);
     }, 3000);
 
     // Safety timeout 2: Force stop spinner after 6s regardless of auth state
@@ -79,8 +80,8 @@ function AppRoutes() {
     }, 6000);
 
     return () => {
-        clearTimeout(longLoadTimer);
-        clearTimeout(forceStopTimer);
+      clearTimeout(longLoadTimer);
+      clearTimeout(forceStopTimer);
     };
   }, [loading]);
 
@@ -88,30 +89,30 @@ function AppRoutes() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-[#020617] text-white px-4">
         <div className="relative">
-             <div className="w-12 h-12 border-4 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin"></div>
-             <div className="absolute inset-0 flex items-center justify-center">
-                 <div className="w-2 h-2 bg-indigo-400 rounded-full"></div>
-             </div>
+          <div className="w-12 h-12 border-4 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin"></div>
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="w-2 h-2 bg-indigo-400 rounded-full"></div>
+          </div>
         </div>
-        
+
         <p className="text-slate-400 text-sm mt-6 font-medium tracking-wide animate-pulse">
-            STARTING STOKCER...
+          STARTING STOKCER...
         </p>
 
         {longLoad && (
-            <div className="mt-8 flex flex-col items-center animate-in fade-in slide-in-from-bottom-2">
-                <p className="text-xs text-slate-500 mb-3 max-w-xs text-center">
-                    Connection is slower than usual.
-                </p>
-                <Button 
-                    variant="outline" 
-                    size="sm"
-                    className="border-slate-700 text-slate-300 hover:text-white"
-                    onClick={() => window.location.reload()}
-                >
-                    Reload Page
-                </Button>
-            </div>
+          <div className="mt-8 flex flex-col items-center animate-in fade-in slide-in-from-bottom-2">
+            <p className="text-xs text-slate-500 mb-3 max-w-xs text-center">
+              Connection is slower than usual.
+            </p>
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-slate-700 text-slate-300 hover:text-white"
+              onClick={() => window.location.reload()}
+            >
+              Reload Page
+            </Button>
+          </div>
         )}
       </div>
     );
@@ -125,7 +126,7 @@ function AppRoutes() {
           <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register-invite" element={<RegisterWithInvitation />} />
-          
+
           {/* Public Store Routes */}
           <Route path="/store" element={<StorePage />} />
           <Route path="/product/:id" element={<ProductDetailPage />} />
@@ -144,7 +145,7 @@ function AppRoutes() {
               <WebDevConsole />
             </AdminRoute>
           } />
-          
+
           {/* User Routes */}
           <Route path="/dashboard" element={
             <UserRoute>
@@ -152,11 +153,11 @@ function AppRoutes() {
             </UserRoute>
           } />
           <Route path="/subscription/success" element={
-             <UserRoute>
-               <SubscriptionSuccessPage />
-             </UserRoute>
+            <UserRoute>
+              <SubscriptionSuccessPage />
+            </UserRoute>
           } />
-          
+
           {/* Catch all - Redirect to root */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
@@ -169,14 +170,16 @@ function App() {
   return (
     <AuthProvider>
       <SubscriptionProvider>
-        <CartProvider>
-          <Helmet>
-            <title>Stokcer - Modern Inventory Management</title>
-            <meta name="description" content="Stokcer - The ultimate inventory management system for modern businesses." />
-          </Helmet>
-          <AppRoutes />
-          <Toaster />
-        </CartProvider>
+        <GeolocationProvider>
+          <CartProvider>
+            <Helmet>
+              <title>Stokcer - Modern Inventory Management</title>
+              <meta name="description" content="Stokcer - The ultimate inventory management system for modern businesses." />
+            </Helmet>
+            <AppRoutes />
+            <Toaster />
+          </CartProvider>
+        </GeolocationProvider>
       </SubscriptionProvider>
     </AuthProvider>
   );
