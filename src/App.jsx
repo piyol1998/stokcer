@@ -11,8 +11,6 @@ import ProductDetailPage from '@/pages/ProductDetailPage';
 import SuccessPage from '@/pages/SuccessPage';
 import SubscriptionPlansPage from '@/pages/SubscriptionPlansPage';
 import SubscriptionSuccessPage from '@/pages/SubscriptionSuccessPage';
-import AdminLogin from '@/pages/admin/AdminLogin';
-import WebDevConsole from '@/pages/admin/WebDevConsole';
 import { Toaster } from '@/components/ui/toaster';
 import { AuthProvider, useAuth } from '@/contexts/SupabaseAuthContext';
 import { CartProvider } from '@/hooks/useCart';
@@ -40,21 +38,6 @@ const UserRoute = ({ children }) => {
   }
 
   return session ? children : <Navigate to="/login" />;
-};
-
-// Protected Route Wrapper for Admins
-const AdminRoute = ({ children }) => {
-  const { session, loading } = useAuth();
-
-  if (loading) {
-    return <div className="flex h-screen w-full items-center justify-center bg-slate-950"><Loader2 className="animate-spin text-white" /></div>;
-  }
-
-  if (!session) {
-    return <Navigate to="/admin/login" />;
-  }
-
-  return children;
 };
 
 function AppRoutes() {
@@ -132,19 +115,6 @@ function AppRoutes() {
           <Route path="/product/:id" element={<ProductDetailPage />} />
           <Route path="/success" element={<SuccessPage />} />
           <Route path="/pricing" element={<SubscriptionPlansPage />} />
-
-          {/* Admin Routes */}
-          <Route path="/admin/login" element={<AdminLogin />} />
-          <Route path="/admin/console" element={
-            <AdminRoute>
-              <WebDevConsole />
-            </AdminRoute>
-          } />
-          <Route path="/admin/dashboard" element={
-            <AdminRoute>
-              <WebDevConsole />
-            </AdminRoute>
-          } />
 
           {/* User Routes */}
           <Route path="/dashboard" element={

@@ -1,20 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/customSupabaseClient';
-import { 
-    Dialog, 
-    DialogContent, 
-    DialogHeader, 
-    DialogTitle, 
-    DialogDescription 
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogDescription
 } from '@/components/ui/dialog';
-import { 
-    Table, 
-    TableBody, 
-    TableCell, 
-    TableHead, 
-    TableHeader, 
-    TableRow 
-} from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -27,7 +19,7 @@ const ProductionBatchModal = ({ isOpen, onClose, ownerId }) => {
     const [batches, setBatches] = useState([]);
     const [loading, setLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
-    
+
     // Local state for the "Bottling Calculator"
     // Format: { [batchId]: { bottledAmount: 0 } }
     const [calculators, setCalculators] = useState({});
@@ -88,8 +80,8 @@ const ProductionBatchModal = ({ isOpen, onClose, ownerId }) => {
 
                     <div className="relative">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                        <Input 
-                            placeholder="Cari Batch ID atau Nama Resep..." 
+                        <Input
+                            placeholder="Cari Batch ID atau Nama Resep..."
                             className="bg-slate-800/50 border-slate-700 pl-10 text-slate-200"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
@@ -133,7 +125,7 @@ const ProductionBatchModal = ({ isOpen, onClose, ownerId }) => {
                                             {/* Volume Calculator */}
                                             <div className="flex-1 bg-slate-950/50 rounded-lg p-3 border border-slate-800/50">
                                                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-center">
-                                                    
+
                                                     {/* Total Volume */}
                                                     <div>
                                                         <span className="text-[10px] uppercase text-slate-500 font-bold tracking-wider">Total Volume</span>
@@ -147,8 +139,8 @@ const ProductionBatchModal = ({ isOpen, onClose, ownerId }) => {
                                                         <div className="px-3 bg-slate-800 border-r border-slate-700 h-full flex items-center justify-center">
                                                             <Wine className="w-4 h-4 text-pink-400" />
                                                         </div>
-                                                        <Input 
-                                                            type="number" 
+                                                        <Input
+                                                            type="number"
                                                             className="border-0 bg-transparent focus-visible:ring-0 h-10 w-full text-right font-mono text-sm"
                                                             placeholder="0"
                                                             value={calculators[batch.id]?.bottledAmount || ''}
@@ -173,7 +165,7 @@ const ProductionBatchModal = ({ isOpen, onClose, ownerId }) => {
                         </div>
                     )}
                 </ScrollArea>
-                
+
                 <div className="p-4 border-t border-slate-700 bg-slate-900/50 flex justify-between items-center text-xs text-slate-500">
                     <p>* Kalkulasi "Sisa Volume" saat ini hanya bersifat visual dan belum disimpan ke database permanen.</p>
                     <Button onClick={onClose} variant="secondary">Tutup</Button>
