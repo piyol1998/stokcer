@@ -21,7 +21,8 @@ import {
     MoreHorizontal,
     Beaker,
     Save,
-    AlertCircle
+    AlertCircle,
+    Trash2
 } from 'lucide-react';
 import { getColorForString } from '@/lib/utils';
 import { format } from 'date-fns';
@@ -123,15 +124,12 @@ const ProductionBatchModal = ({ isOpen, onClose, ownerId }) => {
             setBatches(batches.map(b => b.id === selectedBatch.id ? updatedBatch : b));
 
             // Save to DB
-            // NOTE: This assumes 'bottling_log' column exists. If strictly not allowed to change schema, 
-            // we'd need another way. But assuming standard dev flow, we try to update.
             const { error } = await supabase
                 .from('production_history')
                 .update({ bottling_log: updatedLogs })
                 .eq('id', selectedBatch.id);
 
             if (error) {
-                // If column doesn't exist, we might get an error.
                 if (error.code === '42703') { // Undefined Column
                     throw new Error("Kolom 'bottling_log' belum dibuat di database. Mohon kontak admin database.");
                 }
@@ -151,6 +149,35 @@ const ProductionBatchModal = ({ isOpen, onClose, ownerId }) => {
             fetchBatches();
         } finally {
             setIsSubmitting(false);
+        }
+    };
+
+    const handleDeleteLog = async (logId) => {
+        if (!selectedBatch) return;
+        if (!window.confirm("Hapus riwayat botoling ini? Stok akan dikembalikan.")) return;
+
+        try {
+            const currentLogs = selectedBatch.bottling_log || [];
+            const updatedLogs = currentLogs.filter(log => log.id !== logId);
+
+            // Optimistic update
+            const updatedBatch = { ...selectedBatch, bottling_log: updatedLogs };
+            setSelectedBatch(updatedBatch);
+            setBatches(batches.map(b => b.id === selectedBatch.id ? updatedBatch : b));
+
+            // Save to DB
+            const { error } = await supabase
+                .from('production_history')
+                .update({ bottling_log: updatedLogs })
+                .eq('id', selectedBatch.id);
+
+            if (error) throw error;
+            toast({ title: "Berhasil dihapus", description: "Stok telah dikembalikan." });
+
+        } catch (error) {
+            console.error("Delete Error:", error);
+            toast({ title: "Gagal menghapus", description: error.message, variant: "destructive" });
+            fetchBatches(); // Revert
         }
     };
 
@@ -381,7 +408,7 @@ const ProductionBatchModal = ({ isOpen, onClose, ownerId }) => {
                                         {selectedBatch.bottling_log && selectedBatch.bottling_log.length > 0 ? (
                                             <div className="divide-y divide-slate-800">
                                                 {selectedBatch.bottling_log.map((log, idx) => (
-                                                    <div key={idx} className="p-4 flex justify-between items-center hover:bg-slate-800/50 transition-colors">
+                                                    <div key={idx} className="p-4 flex justify-between items-center hover:bg-slate-800/50 transition-colors group">
                                                         <div>
                                                             <div className="text-sm font-medium text-slate-200">
                                                                 {log.bottle_count} botol x {log.bottle_size} ml
@@ -390,13 +417,23 @@ const ProductionBatchModal = ({ isOpen, onClose, ownerId }) => {
                                                                 {format(new Date(log.user_date || log.date), 'dd MMM yyyy')}
                                                             </div>
                                                         </div>
-                                                        <div className="text-right">
-                                                            <div className="text-sm font-bold text-pink-400">
-                                                                -{log.total_ml.toLocaleString()} ml
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="text-right">
+                                                                <div className="text-sm font-bold text-pink-400">
+                                                                    -{log.total_ml.toLocaleString()} ml
+                                                                </div>
+                                                                <div className="text-[10px] text-slate-600 uppercase tracking-wider mt-1">
+                                                                    TERCATAT
+                                                                </div>
                                                             </div>
-                                                            <div className="text-[10px] text-slate-600 uppercase tracking-wider mt-1">
-                                                                TERCATAT
-                                                            </div>
+                                                            <Button
+                                                                size="icon"
+                                                                variant="ghost"
+                                                                onClick={() => handleDeleteLog(log.id)}
+                                                                className="h-8 w-8 text-slate-600 hover:text-red-400 hover:bg-red-500/10 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                            >
+                                                                <Trash2 className="w-4 h-4" />
+                                                            </Button>
                                                         </div>
                                                     </div>
                                                 ))}
