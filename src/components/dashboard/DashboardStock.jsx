@@ -3,6 +3,7 @@ import { Package, TrendingUp, Activity, BarChart3, DollarSign, Clock, Coins, Wal
 import { supabase } from '@/lib/customSupabaseClient';
 import { useAuth } from '@/contexts/SupabaseAuthContext';
 import RecentActivityWidget from './RecentActivityWidget';
+import ProductionBatchModal from './inventory/ProductionBatchModal';
 
 const DashboardStock = () => {
   const { user, ownerId } = useAuth();
@@ -14,6 +15,7 @@ const DashboardStock = () => {
     sisaModalBahan: 0
   });
   const [loading, setLoading] = useState(true);
+  const [isBatchModalOpen, setIsBatchModalOpen] = useState(false);
 
   useEffect(() => {
     if (ownerId) {
@@ -73,7 +75,7 @@ const DashboardStock = () => {
           const amount = Number(m.price_per_qty_amount) || 1;
           const pricePerUnit = price / amount;
           priceMap[m.id] = pricePerUnit;
-          
+
           // Sisa Modal Bahan Baku = current qty * price per unit
           totalStockValue += (Number(m.quantity) || 0) * pricePerUnit;
 
@@ -151,33 +153,34 @@ const DashboardStock = () => {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(amount);
   };
 
-  const Card = ({ title, value, icon: Icon, colorClass, label, watermarkIcon: Watermark, isCurrency = false }) => (
-    <div className="relative overflow-hidden bg-[#1e293b] border border-slate-800 rounded-3xl p-6 h-48 flex flex-col justify-between shadow-xl transition-transform hover:scale-[1.02]">
+  const Card = ({ title, value, icon: Icon, colorClass, label, watermarkIcon: Watermark, isCurrency = false, onClick, className }) => (
+    <div
+      onClick={onClick}
+      className={`relative overflow-hidden bg-[#1e293b] border border-slate-800 rounded-3xl p-6 h-48 flex flex-col justify-between shadow-xl transition-transform hover:scale-[1.02] ${onClick ? 'cursor-pointer hover:border-slate-600' : ''} ${className || ''}`}
+    >
       <div className="absolute -right-4 -bottom-4 opacity-5 rotate-12 pointer-events-none">
         <Watermark className={`w-32 h-32 ${colorClass}`} />
       </div>
 
       <div className="flex justify-between items-start relative z-10">
-        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg ${
-            colorClass === 'text-blue-500' ? 'bg-blue-500/20 text-blue-400' : 
-            colorClass === 'text-emerald-500' ? 'bg-emerald-500/20 text-emerald-400' : 
-            colorClass === 'text-purple-500' ? 'bg-purple-500/20 text-purple-400' :
-            colorClass === 'text-amber-500' ? 'bg-amber-500/20 text-amber-400' :
-            colorClass === 'text-rose-500' ? 'bg-rose-500/20 text-rose-400' :
-            colorClass === 'text-cyan-500' ? 'bg-cyan-500/20 text-cyan-400' :
-            'bg-slate-500/20 text-slate-400'
-        }`}>
+        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg ${colorClass === 'text-blue-500' ? 'bg-blue-500/20 text-blue-400' :
+            colorClass === 'text-emerald-500' ? 'bg-emerald-500/20 text-emerald-400' :
+              colorClass === 'text-purple-500' ? 'bg-purple-500/20 text-purple-400' :
+                colorClass === 'text-amber-500' ? 'bg-amber-500/20 text-amber-400' :
+                  colorClass === 'text-rose-500' ? 'bg-rose-500/20 text-rose-400' :
+                    colorClass === 'text-cyan-500' ? 'bg-cyan-500/20 text-cyan-400' :
+                      'bg-slate-500/20 text-slate-400'
+          }`}>
           <Icon className="w-6 h-6" />
         </div>
-        <span className={`px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider bg-slate-800 border border-slate-700 ${
-             colorClass === 'text-blue-500' ? 'text-blue-300' : 
-             colorClass === 'text-emerald-500' ? 'text-emerald-300' : 
-             colorClass === 'text-purple-500' ? 'text-purple-300' :
-             colorClass === 'text-amber-500' ? 'text-amber-300' :
-             colorClass === 'text-rose-500' ? 'text-rose-300' :
-             colorClass === 'text-cyan-500' ? 'text-cyan-300' :
-             'text-slate-300'
-        }`}>
+        <span className={`px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider bg-slate-800 border border-slate-700 ${colorClass === 'text-blue-500' ? 'text-blue-300' :
+            colorClass === 'text-emerald-500' ? 'text-emerald-300' :
+              colorClass === 'text-purple-500' ? 'text-purple-300' :
+                colorClass === 'text-amber-500' ? 'text-amber-300' :
+                  colorClass === 'text-rose-500' ? 'text-rose-300' :
+                    colorClass === 'text-cyan-500' ? 'text-cyan-300' :
+                      'text-slate-300'
+          }`}>
           {label}
         </span>
       </div>
@@ -247,6 +250,7 @@ const DashboardStock = () => {
           watermarkIcon={TrendingUp}
         />
         <Card
+          onClick={() => setIsBatchModalOpen(true)}
           title="Total Batch Produksi"
           value={stats.production}
           icon={Activity}
@@ -260,6 +264,12 @@ const DashboardStock = () => {
       <div className="grid grid-cols-1">
         <RecentActivityWidget userId={ownerId} />
       </div>
+
+      <ProductionBatchModal
+        isOpen={isBatchModalOpen}
+        onClose={() => setIsBatchModalOpen(false)}
+        ownerId={ownerId}
+      />
     </div>
   );
 };
