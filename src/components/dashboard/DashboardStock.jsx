@@ -268,7 +268,11 @@ const DashboardStock = ({ onNavigate }) => {
 
       {/* Recent Activity Section */}
       <div className="grid grid-cols-1">
-        <RecentActivityWidget userId={ownerId} />
+        <RecentActivityWidget
+          userId={ownerId}
+          onNavigate={onNavigate}
+          onOpenProduction={() => setIsBatchModalOpen(true)}
+        />
       </div>
 
       <ProductionBatchModal
