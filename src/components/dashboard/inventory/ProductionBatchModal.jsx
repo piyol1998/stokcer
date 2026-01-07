@@ -42,6 +42,7 @@ const ProductionBatchModal = ({ isOpen, onClose, ownerId }) => {
     const [bottlingForm, setBottlingForm] = useState({
         size: '', // ml per bottle
         count: '', // number of bottles
+        description: '', // optional description
         date: new Date().toISOString().split('T')[0]
     });
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -79,6 +80,7 @@ const ProductionBatchModal = ({ isOpen, onClose, ownerId }) => {
         setBottlingForm({
             size: '',
             count: '',
+            description: '',
             date: new Date().toISOString().split('T')[0]
         });
     };
@@ -113,7 +115,8 @@ const ProductionBatchModal = ({ isOpen, onClose, ownerId }) => {
                 user_date: bottlingForm.date,
                 bottle_size: size,
                 bottle_count: count,
-                total_ml: totalUsed
+                total_ml: totalUsed,
+                description: bottlingForm.description || ''
             };
 
             const updatedLogs = [newLog, ...currentLogs];
@@ -139,7 +142,7 @@ const ProductionBatchModal = ({ isOpen, onClose, ownerId }) => {
             toast({ title: "Berhasil", description: `Tercatat: ${count} botol @ ${size}ml` });
 
             // Reset form (keep date)
-            setBottlingForm(prev => ({ ...prev, size: '', count: '' }));
+            setBottlingForm(prev => ({ ...prev, size: '', count: '', description: '' }));
 
         } catch (error) {
             console.error("Bottling Error:", error);
@@ -375,7 +378,15 @@ const ProductionBatchModal = ({ isOpen, onClose, ownerId }) => {
                                                 className="bg-slate-800 border-slate-700 focus-visible:ring-pink-500"
                                                 value={bottlingForm.date}
                                                 onChange={e => setBottlingForm({ ...bottlingForm, date: e.target.value })}
-                                                required
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-xs text-slate-400 font-medium">Deskripsi (Opsional)</label>
+                                            <Input
+                                                placeholder="Contoh: Pesanan untuk Cafe A"
+                                                className="bg-slate-800 border-slate-700 focus-visible:ring-pink-500"
+                                                value={bottlingForm.description}
+                                                onChange={e => setBottlingForm({ ...bottlingForm, description: e.target.value })}
                                             />
                                         </div>
 
@@ -416,6 +427,11 @@ const ProductionBatchModal = ({ isOpen, onClose, ownerId }) => {
                                                             <div className="text-xs text-slate-500 mt-1">
                                                                 {format(new Date(log.user_date || log.date), 'dd MMM yyyy')}
                                                             </div>
+                                                            {log.description && (
+                                                                <div className="text-xs text-slate-400 mt-1 italic">
+                                                                    "{log.description}"
+                                                                </div>
+                                                            )}
                                                         </div>
                                                         <div className="flex items-center gap-3">
                                                             <div className="text-right">

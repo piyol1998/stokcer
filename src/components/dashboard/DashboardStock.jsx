@@ -164,22 +164,22 @@ const DashboardStock = () => {
 
       <div className="flex justify-between items-start relative z-10">
         <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg ${colorClass === 'text-blue-500' ? 'bg-blue-500/20 text-blue-400' :
-            colorClass === 'text-emerald-500' ? 'bg-emerald-500/20 text-emerald-400' :
-              colorClass === 'text-purple-500' ? 'bg-purple-500/20 text-purple-400' :
-                colorClass === 'text-amber-500' ? 'bg-amber-500/20 text-amber-400' :
-                  colorClass === 'text-rose-500' ? 'bg-rose-500/20 text-rose-400' :
-                    colorClass === 'text-cyan-500' ? 'bg-cyan-500/20 text-cyan-400' :
-                      'bg-slate-500/20 text-slate-400'
+          colorClass === 'text-emerald-500' ? 'bg-emerald-500/20 text-emerald-400' :
+            colorClass === 'text-purple-500' ? 'bg-purple-500/20 text-purple-400' :
+              colorClass === 'text-amber-500' ? 'bg-amber-500/20 text-amber-400' :
+                colorClass === 'text-rose-500' ? 'bg-rose-500/20 text-rose-400' :
+                  colorClass === 'text-cyan-500' ? 'bg-cyan-500/20 text-cyan-400' :
+                    'bg-slate-500/20 text-slate-400'
           }`}>
           <Icon className="w-6 h-6" />
         </div>
         <span className={`px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider bg-slate-800 border border-slate-700 ${colorClass === 'text-blue-500' ? 'text-blue-300' :
-            colorClass === 'text-emerald-500' ? 'text-emerald-300' :
-              colorClass === 'text-purple-500' ? 'text-purple-300' :
-                colorClass === 'text-amber-500' ? 'text-amber-300' :
-                  colorClass === 'text-rose-500' ? 'text-rose-300' :
-                    colorClass === 'text-cyan-500' ? 'text-cyan-300' :
-                      'text-slate-300'
+          colorClass === 'text-emerald-500' ? 'text-emerald-300' :
+            colorClass === 'text-purple-500' ? 'text-purple-300' :
+              colorClass === 'text-amber-500' ? 'text-amber-300' :
+                colorClass === 'text-rose-500' ? 'text-rose-300' :
+                  colorClass === 'text-cyan-500' ? 'text-cyan-300' :
+                    'text-slate-300'
           }`}>
           {label}
         </span>
