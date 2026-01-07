@@ -5,8 +5,9 @@ import { useAuth } from '@/contexts/SupabaseAuthContext';
 import RecentActivityWidget from './RecentActivityWidget';
 import ProductionBatchModal from './inventory/ProductionBatchModal';
 
-const DashboardStock = () => {
+const DashboardStock = ({ onNavigate }) => {
   const { user, ownerId } = useAuth();
+
   const [stats, setStats] = useState({
     totalModal: 0,
     materials: 0,
@@ -16,6 +17,7 @@ const DashboardStock = () => {
   });
   const [loading, setLoading] = useState(true);
   const [isBatchModalOpen, setIsBatchModalOpen] = useState(false);
+
 
   useEffect(() => {
     if (ownerId) {
@@ -156,7 +158,7 @@ const DashboardStock = () => {
   const Card = ({ title, value, icon: Icon, colorClass, label, watermarkIcon: Watermark, isCurrency = false, onClick, className }) => (
     <div
       onClick={onClick}
-      className={`relative overflow-hidden bg-[#1e293b] border border-slate-800 rounded-3xl p-6 h-48 flex flex-col justify-between shadow-xl transition-transform hover:scale-[1.02] ${onClick ? 'cursor-pointer hover:border-slate-600' : ''} ${className || ''}`}
+      className={`relative overflow-hidden bg-[#1e293b] border border-slate-800 rounded-3xl p-6 h-48 flex flex-col justify-between shadow-xl transition-transform hover:scale-[1.02] active:scale-[0.98] ${onClick ? 'cursor-pointer hover:border-slate-600' : ''} ${className || ''}`}
     >
       <div className="absolute -right-4 -bottom-4 opacity-5 rotate-12 pointer-events-none">
         <Watermark className={`w-32 h-32 ${colorClass}`} />
@@ -211,6 +213,7 @@ const DashboardStock = () => {
       {/* Financial Metrics Row */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card
+          onClick={() => onNavigate && onNavigate('history')}
           title="Total Modal Dikeluarkan"
           value={stats.totalModalDikeluarkan}
           icon={Wallet}
@@ -220,6 +223,7 @@ const DashboardStock = () => {
           isCurrency={true}
         />
         <Card
+          onClick={() => onNavigate && onNavigate('materials')}
           title="Sisa Modal Bahan Baku"
           value={stats.sisaModalBahan}
           icon={Package}
@@ -229,6 +233,7 @@ const DashboardStock = () => {
           isCurrency={true}
         />
         <Card
+          onClick={() => onNavigate && onNavigate('history')}
           title="Total Modal Produksi"
           value={stats.totalModal}
           icon={Coins}
@@ -242,6 +247,7 @@ const DashboardStock = () => {
       {/* Operational Metrics Row */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Card
+          onClick={() => onNavigate && onNavigate('materials')}
           title="Total Item Bahan Aktif"
           value={stats.materials}
           icon={TrendingUp}
