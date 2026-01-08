@@ -152,7 +152,7 @@ const DashboardStock = ({ onNavigate }) => {
   };
 
   const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(amount);
+    return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(amount);
   };
 
   const Card = ({ title, value, icon: Icon, colorClass, label, watermarkIcon: Watermark, isCurrency = false, onClick, className }) => (

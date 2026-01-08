@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://stokcer.com/sitemap.xml
