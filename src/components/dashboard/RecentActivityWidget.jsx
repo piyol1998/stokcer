@@ -20,9 +20,11 @@ const RecentActivityWidget = ({ userId, onNavigate, onOpenProduction }) => {
   const [activities, setActivities] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  const [productions, setProductions] = useState([]);
+
   useEffect(() => {
     if (userId) {
-      fetchActivities();
+      fetchData();
 
       const subscription = supabase
         .channel('recent-activity-feed')
@@ -46,22 +48,63 @@ const RecentActivityWidget = ({ userId, onNavigate, onOpenProduction }) => {
     }
   }, [userId]);
 
-  const fetchActivities = async () => {
+  const fetchData = async () => {
     try {
-      const { data, error } = await supabase
-        .from('notification_logs')
-        .select('*')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false })
-        .limit(20);
+      const [notifRes, prodRes] = await Promise.all([
+        supabase
+          .from('notification_logs')
+          .select('*')
+          .eq('user_id', userId)
+          .order('created_at', { ascending: false })
+          .limit(20),
+        supabase
+          .from('production_history')
+          .select('id, recipe_name, quantity, date')
+          .eq('user_id', userId)
+          .order('date', { ascending: false })
+          .limit(20)
+      ]);
 
-      if (error) throw error;
-      setActivities(data || []);
+      if (notifRes.error) throw notifRes.error;
+      setActivities(notifRes.data || []);
+
+      if (!prodRes.error) {
+        setProductions(prodRes.data || []);
+      }
     } catch (error) {
       console.error('Error fetching activities:', error);
     } finally {
       setLoading(false);
     }
+  };
+
+  const getRealBatchId = (activity, metaDetails) => {
+    // If it's the new format (UUID segment), use it
+    // UUID segment is usually 8 chars hex. 
+    // Old format timestamp is 6 chars digit usually (from slice(-6) of Date.now())
+    // Let's rely on matching with database first for accuracy.
+
+    if (!productions.length) return metaDetails.batchId;
+
+    // Try to find a matching production record
+    // Match criteria: Same Recipe Name, Same Quantity, Time delta < 2 minutes
+    const activityDate = new Date(activity.created_at).getTime();
+
+    const match = productions.find(p => {
+      const prodDate = new Date(p.date).getTime();
+      const timeDiff = Math.abs(activityDate - prodDate);
+      return (
+        p.recipe_name === metaDetails.recipeName &&
+        Math.abs(p.quantity - metaDetails.quantity) < 0.01 &&
+        timeDiff < 120000 // 2 minutes tolerance
+      );
+    });
+
+    if (match) {
+      return `BATCH-${match.id.substring(0, 8).toUpperCase()}`;
+    }
+
+    return metaDetails.batchId;
   };
 
   const handleActivityClick = (activity) => {
@@ -216,7 +259,9 @@ const RecentActivityWidget = ({ userId, onNavigate, onOpenProduction }) => {
             <div className="flex flex-col gap-0.5 text-slate-400">
               <span className="flex items-center gap-2">
                 {/* Made batch ID look clickable although the whole card is clickable */}
-                <span className="bg-slate-800 px-1 rounded text-[10px] text-slate-500 group-hover:bg-slate-700 transition-colors">{details.batchId}</span>
+                <span className="bg-slate-800 px-1 rounded text-[10px] text-slate-500 group-hover:bg-slate-700 transition-colors">
+                  {getRealBatchId(activity, details)}
+                </span>
                 <span className="text-slate-300">{details.recipeName}</span>
               </span>
               <span className="flex justify-between items-center mt-0.5">
