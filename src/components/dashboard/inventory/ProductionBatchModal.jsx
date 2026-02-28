@@ -430,7 +430,9 @@ const ProductionBatchModal = ({ isOpen, onClose, ownerId }) => {
                                         <>
                                             <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl">
                                                 <p className="text-xs text-slate-500 uppercase font-bold tracking-wider mb-1">Total Modal Batch</p>
-                                                <p className="text-xl font-bold text-white">{selectedBatch?.metadata?.totalCost ? formatCurrency(selectedBatch.metadata.totalCost) : '-'}</p>
+                                                <p className="text-xl font-bold text-white">
+                                                    {selectedBatch?.metadata?.totalCost ? formatCurrency(selectedBatch.metadata.totalCost) : <span className="text-sm font-normal text-slate-500 italic">Belum Tercatat (Data Lama)</span>}
+                                                </p>
                                             </div>
                                             <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl">
                                                 <p className="text-xs text-slate-500 uppercase font-bold tracking-wider mb-1">Volume Awal</p>
@@ -598,7 +600,7 @@ const ProductionBatchModal = ({ isOpen, onClose, ownerId }) => {
                                                                 )}
 
                                                                 {/* Cost breakdown inline */}
-                                                                {selectedBatch?.metadata?.totalCost && (
+                                                                {log.liquid_cost_total !== undefined && (
                                                                     <div className="mt-3 flex flex-col gap-1.5 p-2 bg-slate-900/80 border border-slate-700/50 rounded-lg max-w-[fit-content]">
                                                                         <div className="text-[11px] flex justify-between gap-4 border-b border-slate-700/50 pb-1.5 mb-0.5">
                                                                             <span className="text-slate-400 font-medium">Harga Modal (Liquid + Kemasan):</span>
@@ -608,6 +610,11 @@ const ProductionBatchModal = ({ isOpen, onClose, ownerId }) => {
                                                                             <span className="text-slate-500">Total Biaya Action Ini:</span>
                                                                             <span className="text-white font-medium">{formatCurrency(totalModalBotoling)}</span>
                                                                         </div>
+                                                                        {!selectedBatch?.metadata?.totalCost && log.liquid_cost_total === 0 && (
+                                                                            <div className="text-[9px] text-slate-500 font-medium mt-1">
+                                                                                *Modal Liquid 0 karena Batch ini direkam sebelum fitur update biaya. (Hanya memuat Biaya Kemasan)
+                                                                            </div>
+                                                                        )}
                                                                     </div>
                                                                 )}
                                                             </div>
