@@ -196,7 +196,7 @@ function NewProduction({ onUpdate }) {
                 p_batch_quantity: ratio,
                 p_user_id: user.id,
                 p_ingredients_json: ingredientsPayload,
-                p_metadata: {}
+                p_metadata: { totalCost: calculationData.totalCost }
             });
 
             if (error) throw error;
