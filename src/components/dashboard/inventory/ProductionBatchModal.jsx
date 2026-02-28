@@ -55,7 +55,8 @@ const ProductionBatchModal = ({ isOpen, onClose, ownerId }) => {
         date: new Date().toISOString().split('T')[0],
         bottleMaterialId: '',
         boxMaterialId: '',
-        extraMaterialId: ''
+        extraMaterialId: '',
+        manualExtraCost: ''
     });
     const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -113,7 +114,8 @@ const ProductionBatchModal = ({ isOpen, onClose, ownerId }) => {
             date: new Date().toISOString().split('T')[0],
             bottleMaterialId: '',
             boxMaterialId: '',
-            extraMaterialId: ''
+            extraMaterialId: '',
+            manualExtraCost: ''
         });
     };
 
@@ -155,6 +157,7 @@ const ProductionBatchModal = ({ isOpen, onClose, ownerId }) => {
                 const extraMat = materials.find(m => m.id === bottlingForm.extraMaterialId);
                 if (extraMat) extraUnitCost = (extraMat.price || 0) / (extraMat.price_per_qty_amount || 1);
             }
+            const manualExtraCostTotal = parseFloat(bottlingForm.manualExtraCost) || 0;
 
             const batchCost = selectedBatch?.metadata?.totalCost || 0;
             const batchVol = stats.totalVolume || 1;
@@ -179,6 +182,7 @@ const ProductionBatchModal = ({ isOpen, onClose, ownerId }) => {
                 bottle_unit_cost: bottleUnitCost,
                 box_unit_cost: boxUnitCost,
                 extra_unit_cost: extraUnitCost,
+                manual_extra_cost: manualExtraCostTotal,
                 liquid_cost_total: liquidCostTotal
             };
 
@@ -240,7 +244,7 @@ const ProductionBatchModal = ({ isOpen, onClose, ownerId }) => {
             toast({ title: "Berhasil", description: `Tercatat: ${count} botol @ ${size}ml` });
 
             // Reset form (keep date)
-            setBottlingForm(prev => ({ ...prev, size: '', count: '', description: '', bottleMaterialId: '', boxMaterialId: '', extraMaterialId: '' }));
+            setBottlingForm(prev => ({ ...prev, size: '', count: '', description: '', bottleMaterialId: '', boxMaterialId: '', extraMaterialId: '', manualExtraCost: '' }));
 
         } catch (error) {
             console.error("Bottling Error:", error);
@@ -346,9 +350,12 @@ const ProductionBatchModal = ({ isOpen, onClose, ownerId }) => {
     const extraMaterials = materials.filter(m => {
         const cat = (m.category || '').toLowerCase();
         const nm = (m.name || '').toLowerCase();
-        return !cat.includes('botol') && !nm.includes('botol') &&
-            !cat.includes('box') && !cat.includes('kardus') && !nm.includes('box') &&
-            !cat.includes('bibit') && !cat.includes('pelarut') && !cat.includes('kristal');
+
+        const isCore = cat.includes('botol') || nm.includes('botol') ||
+            cat.includes('box') || cat.includes('kardus') || nm.includes('box') ||
+            cat.includes('bibit') || cat.includes('pelarut') || cat.includes('biang') || cat.includes('alkohol');
+
+        return !isCore;
     });
 
     return (
@@ -587,6 +594,17 @@ const ProductionBatchModal = ({ isOpen, onClose, ownerId }) => {
                                             <p className="text-[10px] text-slate-500">Contoh: Shieldtag, Lakban, Bubble Wrap, dll</p>
                                         </div>
                                         <div className="space-y-2">
+                                            <label className="text-xs text-slate-400 font-medium">Biaya Tambahan Lainnya (Opsional Rp)</label>
+                                            <Input
+                                                type="number"
+                                                placeholder="Contoh: 5000"
+                                                className="bg-slate-800 border-slate-700 focus-visible:ring-indigo-500"
+                                                value={bottlingForm.manualExtraCost}
+                                                onChange={e => setBottlingForm({ ...bottlingForm, manualExtraCost: e.target.value })}
+                                            />
+                                            <p className="text-[10px] text-slate-500 italic">Biaya jasa atau biaya lain yang bukan material stok.</p>
+                                        </div>
+                                        <div className="space-y-2">
                                             <label className="text-xs text-slate-400 font-medium">Tanggal Pengerjaan</label>
                                             <Input
                                                 type="date"
@@ -638,7 +656,8 @@ const ProductionBatchModal = ({ isOpen, onClose, ownerId }) => {
                                                     const botCost = (log.bottle_unit_cost || 0) * (log.bottle_count || 1);
                                                     const bxCost = (log.box_unit_cost || 0) * (log.bottle_count || 1);
                                                     const xtraCost = (log.extra_unit_cost || 0) * (log.bottle_count || 1);
-                                                    const totalModalBotoling = liquidCost + botCost + bxCost + xtraCost;
+                                                    const manualXtra = log.manual_extra_cost || 0;
+                                                    const totalModalBotoling = liquidCost + botCost + bxCost + xtraCost + manualXtra;
                                                     const hargaPerBotol = totalModalBotoling / (log.bottle_count || 1);
 
                                                     return (
@@ -736,6 +755,12 @@ const ProductionBatchModal = ({ isOpen, onClose, ownerId }) => {
                                                                                     <div className="text-[11px] flex justify-between gap-4">
                                                                                         <span className="text-slate-500">- Bahan Tambahan <span className="opacity-70">(1 pcs)</span>:</span>
                                                                                         <span className="text-slate-300">{log.extra_unit_cost ? formatCurrency(log.extra_unit_cost) : 'Rp 0'}</span>
+                                                                                    </div>
+                                                                                )}
+                                                                                {(log.manual_extra_cost > 0) && (
+                                                                                    <div className="text-[11px] flex justify-between gap-4">
+                                                                                        <span className="text-slate-500">- Biaya Lain <span className="opacity-70">(Manual)</span>:</span>
+                                                                                        <span className="text-slate-300">{formatCurrency(log.manual_extra_cost / (log.bottle_count || 1))}</span>
                                                                                     </div>
                                                                                 )}
                                                                             </div>
