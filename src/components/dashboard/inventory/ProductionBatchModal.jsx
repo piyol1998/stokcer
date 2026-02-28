@@ -33,6 +33,7 @@ const ProductionBatchModal = ({ isOpen, onClose, ownerId }) => {
     const [batches, setBatches] = useState([]);
     const [loading, setLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
+    const [materials, setMaterials] = useState([]);
 
     // View State: 'list' | 'detail'
     const [view, setView] = useState('list');
@@ -43,7 +44,9 @@ const ProductionBatchModal = ({ isOpen, onClose, ownerId }) => {
         size: '', // ml per bottle
         count: '', // number of bottles
         description: '', // optional description
-        date: new Date().toISOString().split('T')[0]
+        date: new Date().toISOString().split('T')[0],
+        bottleMaterialId: '',
+        boxMaterialId: ''
     });
     const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -52,8 +55,24 @@ const ProductionBatchModal = ({ isOpen, onClose, ownerId }) => {
             setView('list');
             setSelectedBatch(null);
             fetchBatches();
+            fetchMaterials();
         }
     }, [isOpen, ownerId]);
+
+    const fetchMaterials = async () => {
+        try {
+            const { data, error } = await supabase
+                .from('raw_materials')
+                .select('*')
+                .eq('user_id', ownerId)
+                .is('deleted_at', null);
+            if (!error) {
+                setMaterials(data || []);
+            }
+        } catch (error) {
+            console.error("Error fetching materials:", error);
+        }
+    };
 
     const fetchBatches = async () => {
         setLoading(true);
@@ -81,7 +100,9 @@ const ProductionBatchModal = ({ isOpen, onClose, ownerId }) => {
             size: '',
             count: '',
             description: '',
-            date: new Date().toISOString().split('T')[0]
+            date: new Date().toISOString().split('T')[0],
+            bottleMaterialId: '',
+            boxMaterialId: ''
         });
     };
 
@@ -116,7 +137,9 @@ const ProductionBatchModal = ({ isOpen, onClose, ownerId }) => {
                 bottle_size: size,
                 bottle_count: count,
                 total_ml: totalUsed,
-                description: bottlingForm.description || ''
+                description: bottlingForm.description || '',
+                bottle_material_id: bottlingForm.bottleMaterialId || null,
+                box_material_id: bottlingForm.boxMaterialId || null
             };
 
             const updatedLogs = [newLog, ...currentLogs];
@@ -139,10 +162,36 @@ const ProductionBatchModal = ({ isOpen, onClose, ownerId }) => {
                 throw error;
             }
 
+            // Deduct raw materials if selected
+            const updates = [];
+            const localMatUpdates = [...materials];
+            if (newLog.bottle_material_id) {
+                const mat = materials.find(m => m.id === newLog.bottle_material_id);
+                if (mat) {
+                    const newQty = (parseFloat(mat.quantity) || 0) - count;
+                    updates.push(supabase.from('raw_materials').update({ quantity: newQty }).eq('id', mat.id));
+                    const lIdx = localMatUpdates.findIndex(m => m.id === mat.id);
+                    if (lIdx > -1) localMatUpdates[lIdx].quantity = newQty;
+                }
+            }
+            if (newLog.box_material_id) {
+                const box = materials.find(m => m.id === newLog.box_material_id);
+                if (box) {
+                    const newQty = (parseFloat(box.quantity) || 0) - count;
+                    updates.push(supabase.from('raw_materials').update({ quantity: newQty }).eq('id', box.id));
+                    const lIdx = localMatUpdates.findIndex(m => m.id === box.id);
+                    if (lIdx > -1) localMatUpdates[lIdx].quantity = newQty;
+                }
+            }
+            if (updates.length > 0) {
+                await Promise.all(updates);
+                setMaterials(localMatUpdates);
+            }
+
             toast({ title: "Berhasil", description: `Tercatat: ${count} botol @ ${size}ml` });
 
             // Reset form (keep date)
-            setBottlingForm(prev => ({ ...prev, size: '', count: '', description: '' }));
+            setBottlingForm(prev => ({ ...prev, size: '', count: '', description: '', bottleMaterialId: '', boxMaterialId: '' }));
 
         } catch (error) {
             console.error("Bottling Error:", error);
@@ -161,6 +210,7 @@ const ProductionBatchModal = ({ isOpen, onClose, ownerId }) => {
 
         try {
             const currentLogs = selectedBatch.bottling_log || [];
+            const logToDelete = currentLogs.find(l => l.id === logId);
             const updatedLogs = currentLogs.filter(log => log.id !== logId);
 
             // Optimistic update
@@ -175,6 +225,37 @@ const ProductionBatchModal = ({ isOpen, onClose, ownerId }) => {
                 .eq('id', selectedBatch.id);
 
             if (error) throw error;
+
+            // Restore stock
+            if (logToDelete) {
+                const updates = [];
+                const localMatUpdates = [...materials];
+                const count = parseFloat(logToDelete.bottle_count) || 0;
+
+                if (logToDelete.bottle_material_id) {
+                    const mat = materials.find(m => m.id === logToDelete.bottle_material_id);
+                    if (mat) {
+                        const newQty = (parseFloat(mat.quantity) || 0) + count;
+                        updates.push(supabase.from('raw_materials').update({ quantity: newQty }).eq('id', mat.id));
+                        const lIdx = localMatUpdates.findIndex(m => m.id === mat.id);
+                        if (lIdx > -1) localMatUpdates[lIdx].quantity = newQty;
+                    }
+                }
+                if (logToDelete.box_material_id) {
+                    const box = materials.find(m => m.id === logToDelete.box_material_id);
+                    if (box) {
+                        const newQty = (parseFloat(box.quantity) || 0) + count;
+                        updates.push(supabase.from('raw_materials').update({ quantity: newQty }).eq('id', box.id));
+                        const lIdx = localMatUpdates.findIndex(m => m.id === box.id);
+                        if (lIdx > -1) localMatUpdates[lIdx].quantity = newQty;
+                    }
+                }
+                if (updates.length > 0) {
+                    await Promise.all(updates);
+                    setMaterials(localMatUpdates);
+                }
+            }
+
             toast({ title: "Berhasil dihapus", description: "Stok telah dikembalikan." });
 
         } catch (error) {
@@ -201,6 +282,9 @@ const ProductionBatchModal = ({ isOpen, onClose, ownerId }) => {
             batchId.toLowerCase().includes(searchLower)
         );
     });
+
+    const bottleMaterials = materials.filter(m => (m.category || '').toLowerCase().includes('botol') || (m.name || '').toLowerCase().includes('botol'));
+    const boxMaterials = materials.filter(m => (m.category || '').toLowerCase().includes('box') || (m.category || '').toLowerCase().includes('kardus') || (m.name || '').toLowerCase().includes('box'));
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
@@ -371,6 +455,34 @@ const ProductionBatchModal = ({ isOpen, onClose, ownerId }) => {
                                                 />
                                             </div>
                                         </div>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div className="space-y-2">
+                                                <label className="text-xs text-slate-400 font-medium">Material Botol (Opsional)</label>
+                                                <select
+                                                    className="w-full bg-slate-800 border-slate-700 text-sm text-slate-200 rounded-md py-2 px-3 focus:outline-none focus:ring-1 focus:ring-pink-500"
+                                                    value={bottlingForm.bottleMaterialId}
+                                                    onChange={e => setBottlingForm({ ...bottlingForm, bottleMaterialId: e.target.value })}
+                                                >
+                                                    <option value="">-- Pilih Botol --</option>
+                                                    {bottleMaterials.map(mat => (
+                                                        <option key={mat.id} value={mat.id}>{mat.name} ({mat.quantity} {mat.unit})</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                            <div className="space-y-2">
+                                                <label className="text-xs text-slate-400 font-medium">Material Box (Opsional)</label>
+                                                <select
+                                                    className="w-full bg-slate-800 border-slate-700 text-sm text-slate-200 rounded-md py-2 px-3 focus:outline-none focus:ring-1 focus:ring-pink-500"
+                                                    value={bottlingForm.boxMaterialId}
+                                                    onChange={e => setBottlingForm({ ...bottlingForm, boxMaterialId: e.target.value })}
+                                                >
+                                                    <option value="">-- Pilih Box --</option>
+                                                    {boxMaterials.map(mat => (
+                                                        <option key={mat.id} value={mat.id}>{mat.name} ({mat.quantity} {mat.unit})</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                        </div>
                                         <div className="space-y-2">
                                             <label className="text-xs text-slate-400 font-medium">Tanggal Pengerjaan</label>
                                             <Input
@@ -430,6 +542,12 @@ const ProductionBatchModal = ({ isOpen, onClose, ownerId }) => {
                                                             {log.description && (
                                                                 <div className="text-xs text-slate-400 mt-1 italic">
                                                                     "{log.description}"
+                                                                </div>
+                                                            )}
+                                                            {(log.bottle_material_id || log.box_material_id) && (
+                                                                <div className="flex flex-wrap gap-1 mt-2">
+                                                                    {log.bottle_material_id && <Badge variant="outline" className="text-[10px] bg-indigo-500/10 text-indigo-300 border-indigo-500/20">Botol</Badge>}
+                                                                    {log.box_material_id && <Badge variant="outline" className="text-[10px] bg-amber-500/10 text-amber-300 border-amber-500/20">Box</Badge>}
                                                                 </div>
                                                             )}
                                                         </div>
