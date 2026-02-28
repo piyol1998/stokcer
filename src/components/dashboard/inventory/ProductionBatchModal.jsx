@@ -22,7 +22,10 @@ import {
     Beaker,
     Save,
     AlertCircle,
-    Trash2
+    Trash2,
+    Calculator,
+    ChevronDown,
+    ChevronUp
 } from 'lucide-react';
 import { getColorForString } from '@/lib/utils';
 import { format } from 'date-fns';
@@ -42,6 +45,7 @@ const ProductionBatchModal = ({ isOpen, onClose, ownerId }) => {
     // View State: 'list' | 'detail'
     const [view, setView] = useState('list');
     const [selectedBatch, setSelectedBatch] = useState(null);
+    const [expandedLogId, setExpandedLogId] = useState(null);
 
     // Form State for Bottling
     const [bottlingForm, setBottlingForm] = useState({
@@ -100,6 +104,7 @@ const ProductionBatchModal = ({ isOpen, onClose, ownerId }) => {
     const handleBatchClick = (batch) => {
         setSelectedBatch(batch);
         setView('detail');
+        setExpandedLogId(null);
         setBottlingForm({
             size: '',
             count: '',
@@ -113,6 +118,7 @@ const ProductionBatchModal = ({ isOpen, onClose, ownerId }) => {
     const handleBack = () => {
         setView('list');
         setSelectedBatch(null);
+        setExpandedLogId(null);
     };
 
     const handleSaveBottling = async (e) => {
@@ -579,63 +585,111 @@ const ProductionBatchModal = ({ isOpen, onClose, ownerId }) => {
                                                     const hargaPerBotol = totalModalBotoling / (log.bottle_count || 1);
 
                                                     return (
-                                                        <div key={idx} className="p-4 flex justify-between items-start hover:bg-slate-800/50 transition-colors group">
-                                                            <div className="flex-1">
-                                                                <div className="text-sm font-medium text-slate-200">
-                                                                    {log.bottle_count} botol x {log.bottle_size} ml
-                                                                </div>
-                                                                <div className="text-xs text-slate-500 mt-1">
-                                                                    {format(new Date(log.user_date || log.date), 'dd MMM yyyy')}
-                                                                </div>
-                                                                {log.description && (
-                                                                    <div className="text-xs text-slate-400 mt-1 italic">
-                                                                        "{log.description}"
+                                                        <div key={idx} className="flex flex-col border-b border-slate-800/50 last:border-0 hover:bg-slate-800/30 transition-colors">
+                                                            {/* Header Row (Clickable) */}
+                                                            <div
+                                                                className="p-4 flex justify-between items-start group cursor-pointer"
+                                                                onClick={() => setExpandedLogId(expandedLogId === log.id ? null : log.id)}
+                                                            >
+                                                                <div className="flex-1">
+                                                                    <div className="text-sm font-medium text-slate-200">
+                                                                        {log.bottle_count} botol x {log.bottle_size} ml
                                                                     </div>
-                                                                )}
-                                                                {(log.bottle_material_id || log.box_material_id) && (
-                                                                    <div className="flex flex-wrap gap-1 mt-2 mb-2">
-                                                                        {log.bottle_material_id && <Badge variant="outline" className="text-[10px] bg-indigo-500/10 text-indigo-300 border-indigo-500/20">Botol</Badge>}
-                                                                        {log.box_material_id && <Badge variant="outline" className="text-[10px] bg-amber-500/10 text-amber-300 border-amber-500/20">Box</Badge>}
+                                                                    <div className="text-xs text-slate-500 mt-1">
+                                                                        {format(new Date(log.user_date || log.date), 'dd MMM yyyy')}
                                                                     </div>
-                                                                )}
+                                                                    {log.description && (
+                                                                        <div className="text-xs text-slate-400 mt-1 italic">
+                                                                            "{log.description}"
+                                                                        </div>
+                                                                    )}
+                                                                    {(log.bottle_material_id || log.box_material_id) && (
+                                                                        <div className="flex flex-wrap gap-1 mt-2 mb-2">
+                                                                            {log.bottle_material_id && <Badge variant="outline" className="text-[10px] bg-indigo-500/10 text-indigo-300 border-indigo-500/20">Botol</Badge>}
+                                                                            {log.box_material_id && <Badge variant="outline" className="text-[10px] bg-amber-500/10 text-amber-300 border-amber-500/20">Box</Badge>}
+                                                                        </div>
+                                                                    )}
 
-                                                                {/* Cost breakdown inline */}
-                                                                {log.liquid_cost_total !== undefined && (
-                                                                    <div className="mt-3 flex flex-col gap-1.5 p-2 bg-slate-900/80 border border-slate-700/50 rounded-lg max-w-[fit-content]">
-                                                                        <div className="text-[11px] flex justify-between gap-4 border-b border-slate-700/50 pb-1.5 mb-0.5">
-                                                                            <span className="text-slate-400 font-medium">Harga Modal (Liquid + Kemasan):</span>
-                                                                            <span className="text-amber-400 font-bold">{formatCurrency(hargaPerBotol)} <span className="text-slate-500 font-normal">/ botol</span></span>
+                                                                    {/* Summarized Cost Hint */}
+                                                                    {log.liquid_cost_total !== undefined && expandedLogId !== log.id && (
+                                                                        <div className="mt-2 text-[10px] flex items-center gap-2 text-slate-400 font-medium opacity-80 group-hover:opacity-100 transition-opacity">
+                                                                            <Calculator className="w-3 h-3 text-emerald-500" />
+                                                                            <span>Modal: <span className="text-slate-300">{formatCurrency(totalModalBotoling)}</span></span>
+                                                                            <span className="text-slate-600 px-1">•</span>
+                                                                            <span className="text-indigo-400 flex items-center gap-0.5">Lihat Detail <ChevronDown className="w-3 h-3" /></span>
                                                                         </div>
-                                                                        <div className="text-[11px] flex justify-between gap-4">
-                                                                            <span className="text-slate-500">Total Biaya Action Ini:</span>
-                                                                            <span className="text-white font-medium">{formatCurrency(totalModalBotoling)}</span>
+                                                                    )}
+                                                                </div>
+                                                                <div className="flex flex-col items-end gap-3 justify-start min-w-[100px]">
+                                                                    <div className="text-right flex-1 pt-1">
+                                                                        <div className="text-sm font-bold text-pink-400">
+                                                                            -{log.total_ml.toLocaleString()} ml
                                                                         </div>
+                                                                        <div className="text-[10px] text-slate-600 uppercase tracking-wider mt-1">
+                                                                            TERCATAT
+                                                                        </div>
+                                                                    </div>
+                                                                    <Button
+                                                                        size="icon"
+                                                                        variant="ghost"
+                                                                        onClick={(e) => { e.stopPropagation(); handleDeleteLog(log.id); }}
+                                                                        className="h-8 w-8 mt-2 text-slate-600 hover:text-red-400 hover:bg-red-500/10 opacity-0 group-hover:opacity-100 transition-opacity self-end"
+                                                                    >
+                                                                        <Trash2 className="w-4 h-4" />
+                                                                    </Button>
+                                                                </div>
+                                                            </div>
+
+                                                            {/* Expanded Detailed Cost breakdown */}
+                                                            {expandedLogId === log.id && log.liquid_cost_total !== undefined && (
+                                                                <div className="px-4 pb-4 pt-1 flex justify-center">
+                                                                    <div className="w-full flex flex-col gap-2 p-3 bg-slate-950/80 shadow-inner border border-slate-700/50 rounded-lg cursor-text" onClick={e => e.stopPropagation()}>
+                                                                        <div className="text-[11px] flex items-center gap-1.5 text-indigo-300 font-semibold mb-1">
+                                                                            <Calculator className="w-3.5 h-3.5" />
+                                                                            Rincian Harga Modal
+                                                                            <Button variant="ghost" size="icon" className="h-5 w-5 ml-auto text-slate-500 hover:text-white" onClick={() => setExpandedLogId(null)}>
+                                                                                <ChevronUp className="w-3 h-3" />
+                                                                            </Button>
+                                                                        </div>
+
+                                                                        <div className="bg-slate-900 rounded p-2 border border-slate-800">
+                                                                            <div className="text-[11px] flex justify-between gap-4 border-b border-slate-700/50 pb-2 mb-2">
+                                                                                <span className="text-slate-400 font-medium">BIAYA MODAL 1 BOTOL</span>
+                                                                                <span className="text-emerald-400 font-bold">{formatCurrency(hargaPerBotol)}</span>
+                                                                            </div>
+                                                                            <div className="space-y-1.5">
+                                                                                <div className="text-[11px] flex justify-between gap-4">
+                                                                                    <span className="text-slate-500">- Liquid Isi <span className="opacity-70">({log.bottle_size} ml)</span>:</span>
+                                                                                    <span className="text-slate-300">{formatCurrency(liquidCost / (log.bottle_count || 1))}</span>
+                                                                                </div>
+                                                                                {(log.bottle_material_id) && (
+                                                                                    <div className="text-[11px] flex justify-between gap-4">
+                                                                                        <span className="text-slate-500">- Fisik Botol <span className="opacity-70">(1 pcs)</span>:</span>
+                                                                                        <span className="text-slate-300">{log.bottle_unit_cost ? formatCurrency(log.bottle_unit_cost) : 'Rp 0'}</span>
+                                                                                    </div>
+                                                                                )}
+                                                                                {(log.box_material_id) && (
+                                                                                    <div className="text-[11px] flex justify-between gap-4">
+                                                                                        <span className="text-slate-500">- Fisik Box <span className="opacity-70">(1 pcs)</span>:</span>
+                                                                                        <span className="text-slate-300">{log.box_unit_cost ? formatCurrency(log.box_unit_cost) : 'Rp 0'}</span>
+                                                                                    </div>
+                                                                                )}
+                                                                            </div>
+                                                                        </div>
+
+                                                                        <div className="text-xs flex justify-between items-center gap-4 bg-indigo-500/10 border border-indigo-500/20 p-2 rounded mt-1">
+                                                                            <span className="text-indigo-300 font-medium">TOTAL PENGELUARAN <span className="opacity-75">(x{log.bottle_count} botol)</span></span>
+                                                                            <span className="text-indigo-100 font-bold">{formatCurrency(totalModalBotoling)}</span>
+                                                                        </div>
+
                                                                         {!selectedBatch?.metadata?.totalCost && log.liquid_cost_total === 0 && (
-                                                                            <div className="text-[9px] text-slate-500 font-medium mt-1">
-                                                                                *Modal Liquid 0 karena Batch ini direkam sebelum fitur update biaya. (Hanya memuat Biaya Kemasan)
+                                                                            <div className="text-[10px] text-slate-500 italic mt-1 text-center">
+                                                                                *Modal Liquid 0 karena Batch lawas ini direkam tanpa fitur pelacak harga.
                                                                             </div>
                                                                         )}
                                                                     </div>
-                                                                )}
-                                                            </div>
-                                                            <div className="flex flex-col items-end gap-3 justify-start min-w-[100px]">
-                                                                <div className="text-right flex-1 pt-1">
-                                                                    <div className="text-sm font-bold text-pink-400">
-                                                                        -{log.total_ml.toLocaleString()} ml
-                                                                    </div>
-                                                                    <div className="text-[10px] text-slate-600 uppercase tracking-wider mt-1">
-                                                                        TERCATAT
-                                                                    </div>
                                                                 </div>
-                                                                <Button
-                                                                    size="icon"
-                                                                    variant="ghost"
-                                                                    onClick={() => handleDeleteLog(log.id)}
-                                                                    className="h-8 w-8 mt-2 text-slate-600 hover:text-red-400 hover:bg-red-500/10 opacity-0 group-hover:opacity-100 transition-opacity self-end"
-                                                                >
-                                                                    <Trash2 className="w-4 h-4" />
-                                                                </Button>
-                                                            </div>
+                                                            )}
                                                         </div>
                                                     );
                                                 })}
