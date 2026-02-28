@@ -54,7 +54,8 @@ const ProductionBatchModal = ({ isOpen, onClose, ownerId }) => {
         description: '', // optional description
         date: new Date().toISOString().split('T')[0],
         bottleMaterialId: '',
-        boxMaterialId: ''
+        boxMaterialId: '',
+        extraMaterialId: ''
     });
     const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -111,7 +112,8 @@ const ProductionBatchModal = ({ isOpen, onClose, ownerId }) => {
             description: '',
             date: new Date().toISOString().split('T')[0],
             bottleMaterialId: '',
-            boxMaterialId: ''
+            boxMaterialId: '',
+            extraMaterialId: ''
         });
     };
 
@@ -148,6 +150,12 @@ const ProductionBatchModal = ({ isOpen, onClose, ownerId }) => {
                 const boxMat = materials.find(m => m.id === bottlingForm.boxMaterialId);
                 if (boxMat) boxUnitCost = (boxMat.price || 0) / (boxMat.price_per_qty_amount || 1);
             }
+            let extraUnitCost = 0;
+            if (bottlingForm.extraMaterialId) {
+                const extraMat = materials.find(m => m.id === bottlingForm.extraMaterialId);
+                if (extraMat) extraUnitCost = (extraMat.price || 0) / (extraMat.price_per_qty_amount || 1);
+            }
+
             const batchCost = selectedBatch?.metadata?.totalCost || 0;
             const batchVol = stats.totalVolume || 1;
             const liquidCostPerMl = batchCost / batchVol;
@@ -167,8 +175,10 @@ const ProductionBatchModal = ({ isOpen, onClose, ownerId }) => {
                 description: bottlingForm.description || '',
                 bottle_material_id: bottlingForm.bottleMaterialId || null,
                 box_material_id: bottlingForm.boxMaterialId || null,
+                extra_material_id: bottlingForm.extraMaterialId || null,
                 bottle_unit_cost: bottleUnitCost,
                 box_unit_cost: boxUnitCost,
+                extra_unit_cost: extraUnitCost,
                 liquid_cost_total: liquidCostTotal
             };
 
@@ -213,6 +223,15 @@ const ProductionBatchModal = ({ isOpen, onClose, ownerId }) => {
                     if (lIdx > -1) localMatUpdates[lIdx].quantity = newQty;
                 }
             }
+            if (newLog.extra_material_id) {
+                const xtra = materials.find(m => m.id === newLog.extra_material_id);
+                if (xtra) {
+                    const newQty = (parseFloat(xtra.quantity) || 0) - count;
+                    updates.push(supabase.from('raw_materials').update({ quantity: newQty }).eq('id', xtra.id));
+                    const lIdx = localMatUpdates.findIndex(m => m.id === xtra.id);
+                    if (lIdx > -1) localMatUpdates[lIdx].quantity = newQty;
+                }
+            }
             if (updates.length > 0) {
                 await Promise.all(updates);
                 setMaterials(localMatUpdates);
@@ -221,7 +240,7 @@ const ProductionBatchModal = ({ isOpen, onClose, ownerId }) => {
             toast({ title: "Berhasil", description: `Tercatat: ${count} botol @ ${size}ml` });
 
             // Reset form (keep date)
-            setBottlingForm(prev => ({ ...prev, size: '', count: '', description: '', bottleMaterialId: '', boxMaterialId: '' }));
+            setBottlingForm(prev => ({ ...prev, size: '', count: '', description: '', bottleMaterialId: '', boxMaterialId: '', extraMaterialId: '' }));
 
         } catch (error) {
             console.error("Bottling Error:", error);
@@ -280,6 +299,15 @@ const ProductionBatchModal = ({ isOpen, onClose, ownerId }) => {
                         if (lIdx > -1) localMatUpdates[lIdx].quantity = newQty;
                     }
                 }
+                if (logToDelete.extra_material_id) {
+                    const xtra = materials.find(m => m.id === logToDelete.extra_material_id);
+                    if (xtra) {
+                        const newQty = (parseFloat(xtra.quantity) || 0) + count;
+                        updates.push(supabase.from('raw_materials').update({ quantity: newQty }).eq('id', xtra.id));
+                        const lIdx = localMatUpdates.findIndex(m => m.id === xtra.id);
+                        if (lIdx > -1) localMatUpdates[lIdx].quantity = newQty;
+                    }
+                }
                 if (updates.length > 0) {
                     await Promise.all(updates);
                     setMaterials(localMatUpdates);
@@ -315,6 +343,13 @@ const ProductionBatchModal = ({ isOpen, onClose, ownerId }) => {
 
     const bottleMaterials = materials.filter(m => (m.category || '').toLowerCase().includes('botol') || (m.name || '').toLowerCase().includes('botol'));
     const boxMaterials = materials.filter(m => (m.category || '').toLowerCase().includes('box') || (m.category || '').toLowerCase().includes('kardus') || (m.name || '').toLowerCase().includes('box'));
+    const extraMaterials = materials.filter(m => {
+        const cat = (m.category || '').toLowerCase();
+        const nm = (m.name || '').toLowerCase();
+        return !cat.includes('botol') && !nm.includes('botol') &&
+            !cat.includes('box') && !cat.includes('kardus') && !nm.includes('box') &&
+            !cat.includes('bibit') && !cat.includes('pelarut') && !cat.includes('kristal');
+    });
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
@@ -538,6 +573,20 @@ const ProductionBatchModal = ({ isOpen, onClose, ownerId }) => {
                                             </div>
                                         </div>
                                         <div className="space-y-2">
+                                            <label className="text-xs text-slate-400 font-medium">Bahan Tambahan (Opsional)</label>
+                                            <select
+                                                className="w-full bg-slate-800 border-slate-700 text-sm text-slate-200 rounded-md py-2 px-3 focus:outline-none focus:ring-1 focus:ring-pink-500"
+                                                value={bottlingForm.extraMaterialId}
+                                                onChange={e => setBottlingForm({ ...bottlingForm, extraMaterialId: e.target.value })}
+                                            >
+                                                <option value="">-- Pilih Aksesoris / Material Lain --</option>
+                                                {extraMaterials.map(mat => (
+                                                    <option key={mat.id} value={mat.id}>{mat.name} ({mat.quantity} {mat.unit})</option>
+                                                ))}
+                                            </select>
+                                            <p className="text-[10px] text-slate-500">Contoh: Shieldtag, Lakban, Bubble Wrap, dll</p>
+                                        </div>
+                                        <div className="space-y-2">
                                             <label className="text-xs text-slate-400 font-medium">Tanggal Pengerjaan</label>
                                             <Input
                                                 type="date"
@@ -588,7 +637,8 @@ const ProductionBatchModal = ({ isOpen, onClose, ownerId }) => {
                                                     const liquidCost = log.liquid_cost_total || 0;
                                                     const botCost = (log.bottle_unit_cost || 0) * (log.bottle_count || 1);
                                                     const bxCost = (log.box_unit_cost || 0) * (log.bottle_count || 1);
-                                                    const totalModalBotoling = liquidCost + botCost + bxCost;
+                                                    const xtraCost = (log.extra_unit_cost || 0) * (log.bottle_count || 1);
+                                                    const totalModalBotoling = liquidCost + botCost + bxCost + xtraCost;
                                                     const hargaPerBotol = totalModalBotoling / (log.bottle_count || 1);
 
                                                     return (
@@ -610,10 +660,11 @@ const ProductionBatchModal = ({ isOpen, onClose, ownerId }) => {
                                                                             "{log.description}"
                                                                         </div>
                                                                     )}
-                                                                    {(log.bottle_material_id || log.box_material_id) && (
+                                                                    {(log.bottle_material_id || log.box_material_id || log.extra_material_id) && (
                                                                         <div className="flex flex-wrap gap-1 mt-2 mb-2">
                                                                             {log.bottle_material_id && <Badge variant="outline" className="text-[10px] bg-indigo-500/10 text-indigo-300 border-indigo-500/20">Botol</Badge>}
                                                                             {log.box_material_id && <Badge variant="outline" className="text-[10px] bg-amber-500/10 text-amber-300 border-amber-500/20">Box</Badge>}
+                                                                            {log.extra_material_id && <Badge variant="outline" className="text-[10px] bg-emerald-500/10 text-emerald-300 border-emerald-500/20">Tambahan</Badge>}
                                                                         </div>
                                                                     )}
 
@@ -679,6 +730,12 @@ const ProductionBatchModal = ({ isOpen, onClose, ownerId }) => {
                                                                                     <div className="text-[11px] flex justify-between gap-4">
                                                                                         <span className="text-slate-500">- Fisik Box <span className="opacity-70">(1 pcs)</span>:</span>
                                                                                         <span className="text-slate-300">{log.box_unit_cost ? formatCurrency(log.box_unit_cost) : 'Rp 0'}</span>
+                                                                                    </div>
+                                                                                )}
+                                                                                {(log.extra_material_id) && (
+                                                                                    <div className="text-[11px] flex justify-between gap-4">
+                                                                                        <span className="text-slate-500">- Bahan Tambahan <span className="opacity-70">(1 pcs)</span>:</span>
+                                                                                        <span className="text-slate-300">{log.extra_unit_cost ? formatCurrency(log.extra_unit_cost) : 'Rp 0'}</span>
                                                                                     </div>
                                                                                 )}
                                                                             </div>
