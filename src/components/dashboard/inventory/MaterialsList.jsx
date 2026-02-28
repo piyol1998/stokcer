@@ -320,53 +320,90 @@ function MaterialsList({ onUpdate }) {
         return acc;
     }, {});
 
+    const baseCategories = ['Botol', 'Box', 'Bibit', 'Pelarut'];
+    const allCategoriesLower = new Set([...baseCategories.map(c => c.toLowerCase()), ...Object.keys(groupedCategories).map(c => c.toLowerCase())]);
+
+    // Convert to nice layout data mapping
+    const categoryDataMap = Array.from(allCategoriesLower).map(catLower => {
+        const displayCat = baseCategories.find(c => c.toLowerCase() === catLower) || (catLower.charAt(0).toUpperCase() + catLower.slice(1));
+        const dbCatEntry = Object.entries(groupedCategories).find(([dbCat]) => dbCat.toLowerCase() === catLower);
+
+        return {
+            name: displayCat,
+            count: dbCatEntry ? dbCatEntry[1].count : 0,
+            totalValue: dbCatEntry ? dbCatEntry[1].totalValue : 0
+        };
+    }).sort((a, b) => {
+        // Force the main 4 to always be first in exact order
+        const aIdx = baseCategories.findIndex(c => c.toLowerCase() === a.name.toLowerCase());
+        const bIdx = baseCategories.findIndex(c => c.toLowerCase() === b.name.toLowerCase());
+        if (aIdx !== -1 && bIdx !== -1) return aIdx - bIdx;
+        if (aIdx !== -1) return -1;
+        if (bIdx !== -1) return 1;
+        return a.name.localeCompare(b.name);
+    });
+
     const getCategoryStyles = (catName) => {
         const lower = (catName || '').toLowerCase();
+
         if (lower.includes('bibit')) return {
-            icon: <Droplets className="w-8 h-8 text-purple-400 group-hover:scale-110 transition-transform duration-300" />,
-            bg: "bg-gradient-to-br from-purple-900/20 to-slate-900 border-purple-500/20 hover:border-purple-500/50",
-            shadowHover: "hover:shadow-2xl hover:shadow-purple-500/20",
-            blob: "bg-purple-600",
-            iconWrapper: "bg-purple-500/10 border-purple-500/30",
-            text: "text-purple-400",
-            titleHover: "group-hover:text-purple-300"
+            icon: <Droplets className="w-20 h-20 text-[#fbbf24] filter drop-shadow-[0_0_15px_rgba(251,191,36,0.8)]" strokeWidth={1.5} />,
+            bgGradient: "from-[#451a03]/60 via-[#1f1614]/70 to-[#0f0e13]",
+            accentColor: "border-[#b45309]/50",
+            btnColor: "bg-[#7A36ED] hover:bg-[#8B5CF6] shadow-purple-900/50",
+            glowBlob: "bg-amber-500"
         };
         if (lower.includes('pelarut') || lower.includes('alkohol')) return {
-            icon: <FlaskConical className="w-8 h-8 text-blue-400 group-hover:scale-110 transition-transform duration-300" />,
-            bg: "bg-gradient-to-br from-blue-900/20 to-slate-900 border-blue-500/20 hover:border-blue-500/50",
-            shadowHover: "hover:shadow-2xl hover:shadow-blue-500/20",
-            blob: "bg-blue-600",
-            iconWrapper: "bg-blue-500/10 border-blue-500/30",
-            text: "text-blue-400",
-            titleHover: "group-hover:text-blue-300"
+            icon: <FlaskConical className="w-20 h-20 text-[#22d3ee] filter drop-shadow-[0_0_15px_rgba(34,211,238,0.8)]" strokeWidth={1.5} />,
+            bgGradient: "from-[#083344]/60 via-[#091f2c]/70 to-[#0f0e13]",
+            accentColor: "border-[#0891b2]/50",
+            btnColor: "bg-[#7A36ED] hover:bg-[#8B5CF6] shadow-purple-900/50",
+            glowBlob: "bg-cyan-500"
         };
         if (lower.includes('botol')) return {
-            icon: <Layers className="w-8 h-8 text-cyan-400 group-hover:scale-110 transition-transform duration-300" />,
-            bg: "bg-gradient-to-br from-cyan-900/20 to-slate-900 border-cyan-500/20 hover:border-cyan-500/50",
-            shadowHover: "hover:shadow-2xl hover:shadow-cyan-500/20",
-            blob: "bg-cyan-600",
-            iconWrapper: "bg-cyan-500/10 border-cyan-500/30",
-            text: "text-cyan-400",
-            titleHover: "group-hover:text-cyan-300"
+            icon: (
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-20 h-20 text-[#60a5fa] filter drop-shadow-[0_0_15px_rgba(96,165,250,0.8)]">
+                    <path d="M10 2v5" />
+                    <path d="M14 2v5" />
+                    <path d="M7 10v9a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2v-9a4 4 0 0 0-4-4h-2a4 4 0 0 0-4 4Z" />
+                    <path d="M7 15h10" />
+                    <circle cx="12" cy="18" r="1" fill="currentColor" />
+                </svg>
+            ),
+            bgGradient: "from-[#1e3a8a]/60 via-[#111827]/70 to-[#0f0e13]",
+            accentColor: "border-[#2563eb]/50",
+            btnColor: "bg-[#7A36ED] hover:bg-[#8B5CF6] shadow-purple-900/50",
+            glowBlob: "bg-blue-500"
         };
         if (lower.includes('box') || lower.includes('kardus')) return {
-            icon: <Box className="w-8 h-8 text-amber-400 group-hover:scale-110 transition-transform duration-300" />,
-            bg: "bg-gradient-to-br from-amber-900/20 to-slate-900 border-amber-500/20 hover:border-amber-500/50",
-            shadowHover: "hover:shadow-2xl hover:shadow-amber-500/20",
-            blob: "bg-amber-600",
-            iconWrapper: "bg-amber-500/10 border-amber-500/30",
-            text: "text-amber-400",
-            titleHover: "group-hover:text-amber-300"
+            icon: <Box className="w-20 h-20 text-[#fcd34d] filter drop-shadow-[0_0_15px_rgba(252,211,77,0.7)]" strokeWidth={1.5} />,
+            bgGradient: "from-[#452703]/60 via-[#1f1710]/70 to-[#0f0e13]",
+            accentColor: "border-[#d97706]/50",
+            btnColor: "bg-[#7A36ED] hover:bg-[#8B5CF6] shadow-purple-900/50",
+            glowBlob: "bg-yellow-500"
         };
         return {
-            icon: <Component className="w-8 h-8 text-slate-400 group-hover:scale-110 transition-transform duration-300" />,
-            bg: "bg-gradient-to-br from-slate-800/50 to-slate-900 border-slate-700/50 hover:border-slate-500/50",
-            shadowHover: "hover:shadow-2xl hover:shadow-slate-500/20",
-            blob: "bg-slate-600",
-            iconWrapper: "bg-slate-800 border-slate-600",
-            text: "text-slate-300",
-            titleHover: "group-hover:text-slate-200"
+            icon: <Component className="w-20 h-20 text-[#cbd5e1] filter drop-shadow-[0_0_15px_rgba(203,213,225,0.6)]" strokeWidth={1.5} />,
+            bgGradient: "from-[#1e293b]/60 via-[#0f172a]/70 to-[#0f172a]",
+            accentColor: "border-[#475569]/50",
+            btnColor: "bg-slate-600 hover:bg-slate-500 shadow-slate-900/50",
+            glowBlob: "bg-slate-500"
         };
+    };
+
+    const handleAddClick = (e, catName) => {
+        e.stopPropagation();
+        if (!canAddMore) {
+            toast({
+                title: "Limit Tercapai",
+                description: `Paket Free maksimal ${maxMaterials} bahan.`,
+                variant: "destructive"
+            });
+            return;
+        }
+        resetForm();
+        setFormData(prev => ({ ...prev, category: catName }));
+        setIsDialogOpen(true);
     };
 
     return (
@@ -636,39 +673,49 @@ function MaterialsList({ onUpdate }) {
             </Dialog>
 
             {categoryFilter === 'all' && !searchTerm ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                    {Object.entries(groupedCategories).map(([catName, data]) => {
-                        const style = getCategoryStyles(catName);
+                <div className="flex flex-col items-center justify-center py-10 rounded-2xl bg-gradient-to-b from-[#0f0e17] to-[#12122b] border border-indigo-900/30 relative">
+                    {/* Fake stars background overlay */}
+                    <div className="absolute inset-0 opacity-[0.15] bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-indigo-300/30 via-transparent to-transparent pointer-events-none" style={{ backgroundImage: "radial-gradient(white 1px, transparent 1px)", backgroundSize: "40px 40px" }} />
+                    <div className="absolute top-0 left-0 w-full h-full object-cover mix-blend-screen opacity-40 pointer-events-none bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-900/40 via-transparent to-transparent" />
 
-                        return (
-                            <div
-                                key={catName}
-                                onClick={() => setCategoryFilter(catName)}
-                                className={`cursor-pointer group relative overflow-hidden rounded-2xl border ${style.bg} ${style.shadowHover} p-6 transition-all duration-300 hover:scale-[102%]`}
-                            >
-                                <div className={`absolute -right-6 -top-6 w-24 h-24 rounded-full ${style.blob} blur-3xl opacity-20 group-hover:opacity-40 transition-opacity duration-500`} />
+                    <div className="relative z-10 text-center mb-12">
+                        <h2 className="text-3xl font-extrabold text-white mb-2 tracking-wide drop-shadow-md">Data Bahan Baku</h2>
+                        <p className="text-slate-400 text-sm font-medium">Tambahkan bibit, pelarut, botol, box, dan lainnya.</p>
+                    </div>
 
-                                <div className="relative z-10 flex flex-col h-full gap-4">
-                                    <div className="flex justify-between items-start">
-                                        <div className={`p-3 rounded-xl border ${style.iconWrapper} transition-colors duration-300`}>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 w-full max-w-6xl px-6 relative z-10">
+                        {categoryDataMap.map((data) => {
+                            const style = getCategoryStyles(data.name);
+                            return (
+                                <div
+                                    key={data.name}
+                                    onClick={() => setCategoryFilter(data.name)}
+                                    className={`cursor-pointer group relative overflow-hidden rounded-2xl border ${style.accentColor} bg-gradient-to-b ${style.bgGradient} p-8 flex flex-col items-center text-center transition-all duration-500 hover:scale-[103%] hover:shadow-2xl hover:shadow-indigo-900/40`}
+                                >
+                                    {/* background blob under icon */}
+                                    <div className={`absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 rounded-full ${style.glowBlob} blur-[50px] opacity-20 group-hover:opacity-40 transition-opacity duration-700`} />
+
+                                    <div className="relative z-10 flex flex-col items-center w-full h-full justify-between gap-8">
+                                        <div className="mt-4 transform transition-transform duration-500 group-hover:-translate-y-2">
                                             {style.icon}
                                         </div>
-                                        <span className="text-xs font-semibold text-slate-300 px-2.5 py-1 bg-slate-950/50 rounded-full border border-slate-800">
-                                            {data.count} items
-                                        </span>
-                                    </div>
 
-                                    <div className="mt-4">
-                                        <h3 className={`text-xl font-bold text-white mb-2 ${style.titleHover} transition-colors`}>{catName}</h3>
-                                        <div className="flex flex-col gap-1 mt-4 pt-4 border-t border-slate-700/50">
-                                            <span className="text-xs font-medium text-slate-500 uppercase tracking-wider">Total Nilai Asset</span>
-                                            <span className={`text-lg font-bold ${style.text}`}>{formatCurrency(data.totalValue)}</span>
+                                        <div className="flex flex-col items-center w-full mt-auto">
+                                            <h3 className="text-2xl font-bold text-white mb-1 tracking-wide drop-shadow-md">{data.name}</h3>
+                                            <p className="text-sm font-medium text-slate-400 mb-6">{data.count} item</p>
+
+                                            <Button
+                                                onClick={(e) => handleAddClick(e, data.name)}
+                                                className={`w-full font-bold text-white rounded-lg ${style.btnColor} border border-white/5 transition-all duration-300 group-hover:shadow-xl`}
+                                            >
+                                                Tambah
+                                            </Button>
                                         </div>
                                     </div>
                                 </div>
-                            </div>
-                        )
-                    })}
+                            )
+                        })}
+                    </div>
                 </div>
             ) : (
                 <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
