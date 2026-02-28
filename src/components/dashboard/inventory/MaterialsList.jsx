@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/customSupabaseClient';
-import { Database, Plus, Search, ShoppingCart, Edit, ExternalLink, Calendar as CalendarIcon, DollarSign, Package, Trash2, Lock, AlertTriangle, Filter, ChevronDown, Check } from 'lucide-react';
+import { Database, Plus, Search, ShoppingCart, Edit, ExternalLink, Calendar as CalendarIcon, DollarSign, Package, Trash2, Lock, AlertTriangle, Filter, ChevronDown, Check, Droplets, FlaskConical, Layers, Component, Box, ChevronLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
@@ -309,6 +309,66 @@ function MaterialsList({ onUpdate }) {
         cat.toLowerCase().includes((formData.category || '').toLowerCase())
     );
 
+    const groupedCategories = materials.reduce((acc, curr) => {
+        const cat = curr.category || 'Lainnya';
+        if (!acc[cat]) {
+            acc[cat] = { count: 0, totalValue: 0 };
+        }
+        const pricePerUnit = curr.price && curr.price_per_qty_amount ? curr.price / curr.price_per_qty_amount : (curr.price || 0);
+        acc[cat].totalValue += (pricePerUnit * (curr.quantity || 0));
+        acc[cat].count += 1;
+        return acc;
+    }, {});
+
+    const getCategoryStyles = (catName) => {
+        const lower = (catName || '').toLowerCase();
+        if (lower.includes('bibit')) return {
+            icon: <Droplets className="w-8 h-8 text-purple-400 group-hover:scale-110 transition-transform duration-300" />,
+            bg: "bg-gradient-to-br from-purple-900/20 to-slate-900 border-purple-500/20 hover:border-purple-500/50",
+            shadowHover: "hover:shadow-2xl hover:shadow-purple-500/20",
+            blob: "bg-purple-600",
+            iconWrapper: "bg-purple-500/10 border-purple-500/30",
+            text: "text-purple-400",
+            titleHover: "group-hover:text-purple-300"
+        };
+        if (lower.includes('pelarut') || lower.includes('alkohol')) return {
+            icon: <FlaskConical className="w-8 h-8 text-blue-400 group-hover:scale-110 transition-transform duration-300" />,
+            bg: "bg-gradient-to-br from-blue-900/20 to-slate-900 border-blue-500/20 hover:border-blue-500/50",
+            shadowHover: "hover:shadow-2xl hover:shadow-blue-500/20",
+            blob: "bg-blue-600",
+            iconWrapper: "bg-blue-500/10 border-blue-500/30",
+            text: "text-blue-400",
+            titleHover: "group-hover:text-blue-300"
+        };
+        if (lower.includes('botol')) return {
+            icon: <Layers className="w-8 h-8 text-cyan-400 group-hover:scale-110 transition-transform duration-300" />,
+            bg: "bg-gradient-to-br from-cyan-900/20 to-slate-900 border-cyan-500/20 hover:border-cyan-500/50",
+            shadowHover: "hover:shadow-2xl hover:shadow-cyan-500/20",
+            blob: "bg-cyan-600",
+            iconWrapper: "bg-cyan-500/10 border-cyan-500/30",
+            text: "text-cyan-400",
+            titleHover: "group-hover:text-cyan-300"
+        };
+        if (lower.includes('box') || lower.includes('kardus')) return {
+            icon: <Box className="w-8 h-8 text-amber-400 group-hover:scale-110 transition-transform duration-300" />,
+            bg: "bg-gradient-to-br from-amber-900/20 to-slate-900 border-amber-500/20 hover:border-amber-500/50",
+            shadowHover: "hover:shadow-2xl hover:shadow-amber-500/20",
+            blob: "bg-amber-600",
+            iconWrapper: "bg-amber-500/10 border-amber-500/30",
+            text: "text-amber-400",
+            titleHover: "group-hover:text-amber-300"
+        };
+        return {
+            icon: <Component className="w-8 h-8 text-slate-400 group-hover:scale-110 transition-transform duration-300" />,
+            bg: "bg-gradient-to-br from-slate-800/50 to-slate-900 border-slate-700/50 hover:border-slate-500/50",
+            shadowHover: "hover:shadow-2xl hover:shadow-slate-500/20",
+            blob: "bg-slate-600",
+            iconWrapper: "bg-slate-800 border-slate-600",
+            text: "text-slate-300",
+            titleHover: "group-hover:text-slate-200"
+        };
+    };
+
     return (
         <div className="space-y-6">
             {/* Stats Summary Card */}
@@ -575,105 +635,157 @@ function MaterialsList({ onUpdate }) {
                 </DialogContent>
             </Dialog>
 
-            <div className="bg-[#1e293b] rounded-xl border border-slate-700/50 overflow-hidden shadow-xl">
-                <div className="overflow-x-auto">
-                    <table className="w-full text-left text-sm">
-                        <thead>
-                            <tr className="bg-[#0f172a] border-b border-slate-700 text-slate-400">
-                                <th className="px-6 py-4 font-medium">Nama Bahan</th>
-                                <th className="px-6 py-4 font-medium">Kategori</th>
-                                <th className="px-6 py-4 font-medium">Stok</th>
-                                <th className="px-6 py-4 font-medium">Satuan</th>
-                                <th className="px-6 py-4 font-medium">Harga / Unit</th>
-                                <th className="px-6 py-4 font-medium text-right">Total Nilai</th>
-                                <th className="px-6 py-4 font-medium">Link Pembelian</th>
-                                <th className="px-6 py-4 font-medium text-center">Aksi</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-700/50">
-                            {filtered.map(item => {
-                                const pricePerUnit = item.price && item.price_per_qty_amount ? item.price / item.price_per_qty_amount : (item.price || 0);
-                                const displayPrice = item.price ? formatCurrency(item.price) : '-';
-                                const displayQty = item.price_per_qty_amount && item.price_per_qty_amount > 1 ? ` per ${item.price_per_qty_amount} ${item.unit}` : ` / ${item.unit}`;
-                                const totalVal = pricePerUnit * (item.quantity || 0);
+            {categoryFilter === 'all' && !searchTerm ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                    {Object.entries(groupedCategories).map(([catName, data]) => {
+                        const style = getCategoryStyles(catName);
 
-                                return (
-                                    <tr key={item.id} className="hover:bg-slate-800/50 transition-colors group">
-                                        <td className="px-6 py-4 font-medium text-white">
-                                            {item.name}
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
-                                                {item.category || 'General'}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4 font-bold text-white">
-                                            {item.quantity}
-                                        </td>
-                                        <td className="px-6 py-4 text-slate-400">{item.unit}</td>
-                                        <td className="px-6 py-4 text-slate-400">
-                                            {displayPrice}
-                                            <span className="text-xs text-slate-500 block">{displayQty}</span>
-                                        </td>
-                                        <td className="px-6 py-4 text-right font-medium text-emerald-400">
-                                            {item.price ? formatCurrency(totalVal) : '-'}
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            {item.purchase_link ? (
-                                                <a
-                                                    href={item.purchase_link}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="inline-flex items-center gap-1 text-indigo-400 hover:text-indigo-300 hover:underline text-xs"
-                                                >
-                                                    Buka Link <ExternalLink className="w-3 h-3" />
-                                                </a>
-                                            ) : (
-                                                <span className="text-slate-600 text-xs">-</span>
-                                            )}
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <div className="flex items-center justify-center gap-2">
-                                                <button
-                                                    onClick={() => openRestock(item)}
-                                                    className="p-2 rounded-lg bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 hover:text-emerald-300 transition-all shadow-sm hover:shadow-emerald-500/20"
-                                                    title="Tambah Stok (Belanja)"
-                                                >
-                                                    <ShoppingCart className="w-4 h-4" />
-                                                </button>
-                                                <button
-                                                    onClick={() => openEdit(item)}
-                                                    className="p-2 rounded-lg bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20 hover:text-indigo-300 transition-all"
-                                                    title="Edit Detail"
-                                                >
-                                                    <Edit className="w-4 h-4" />
-                                                </button>
-                                                <button
-                                                    onClick={() => handleDelete(item.id, item.name)}
-                                                    className="p-2 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 hover:text-red-300 transition-all"
-                                                    title="Hapus Bahan"
-                                                >
-                                                    <Trash2 className="w-4 h-4" />
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                );
-                            })}
-                            {filtered.length === 0 && (
-                                <tr>
-                                    <td colSpan="8" className="px-6 py-12 text-center text-slate-500">
-                                        <div className="flex flex-col items-center gap-2">
-                                            <Package className="w-10 h-10 opacity-20" />
-                                            <p>Data bahan baku kosong atau tidak ditemukan</p>
+                        return (
+                            <div
+                                key={catName}
+                                onClick={() => setCategoryFilter(catName)}
+                                className={`cursor-pointer group relative overflow-hidden rounded-2xl border ${style.bg} ${style.shadowHover} p-6 transition-all duration-300 hover:scale-[102%]`}
+                            >
+                                <div className={`absolute -right-6 -top-6 w-24 h-24 rounded-full ${style.blob} blur-3xl opacity-20 group-hover:opacity-40 transition-opacity duration-500`} />
+
+                                <div className="relative z-10 flex flex-col h-full gap-4">
+                                    <div className="flex justify-between items-start">
+                                        <div className={`p-3 rounded-xl border ${style.iconWrapper} transition-colors duration-300`}>
+                                            {style.icon}
                                         </div>
-                                    </td>
-                                </tr>
-                            )}
-                        </tbody>
-                    </table>
+                                        <span className="text-xs font-semibold text-slate-300 px-2.5 py-1 bg-slate-950/50 rounded-full border border-slate-800">
+                                            {data.count} items
+                                        </span>
+                                    </div>
+
+                                    <div className="mt-4">
+                                        <h3 className={`text-xl font-bold text-white mb-2 ${style.titleHover} transition-colors`}>{catName}</h3>
+                                        <div className="flex flex-col gap-1 mt-4 pt-4 border-t border-slate-700/50">
+                                            <span className="text-xs font-medium text-slate-500 uppercase tracking-wider">Total Nilai Asset</span>
+                                            <span className={`text-lg font-bold ${style.text}`}>{formatCurrency(data.totalValue)}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )
+                    })}
                 </div>
-            </div>
+            ) : (
+                <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between bg-[#1e293b] p-4 rounded-xl border border-slate-700/50 shadow-sm gap-4">
+                        <div className="flex items-center gap-3">
+                            <Button variant="ghost" size="sm" onClick={() => { setCategoryFilter('all'); setSearchTerm(''); }} className="text-slate-400 hover:text-white hover:bg-slate-800">
+                                <ChevronLeft className="w-4 h-4 mr-1" />
+                                Kembali ke Kategori
+                            </Button>
+                            <div className="hidden sm:block h-4 w-[1px] bg-slate-700" />
+                            {categoryFilter !== 'all' && <span className="text-indigo-400 font-bold uppercase tracking-wider">{categoryFilter}</span>}
+                            {searchTerm && <span className="text-sm text-slate-400">Pencarian: "{searchTerm}"</span>}
+                        </div>
+                        <span className="text-sm font-medium text-slate-300 bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-700">{filtered.length} items ditemukan</span>
+                    </div>
+
+                    <div className="bg-[#1e293b] rounded-xl border border-slate-700/50 overflow-hidden shadow-xl">
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left text-sm">
+                                <thead>
+                                    <tr className="bg-[#0f172a] border-b border-slate-700 text-slate-400">
+                                        <th className="px-6 py-4 font-medium">Nama Bahan</th>
+                                        <th className="px-6 py-4 font-medium">Kategori</th>
+                                        <th className="px-6 py-4 font-medium">Stok</th>
+                                        <th className="px-6 py-4 font-medium">Satuan</th>
+                                        <th className="px-6 py-4 font-medium">Harga / Unit</th>
+                                        <th className="px-6 py-4 font-medium text-right">Total Nilai</th>
+                                        <th className="px-6 py-4 font-medium">Link Pembelian</th>
+                                        <th className="px-6 py-4 font-medium text-center">Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-700/50">
+                                    {filtered.map(item => {
+                                        const pricePerUnit = item.price && item.price_per_qty_amount ? item.price / item.price_per_qty_amount : (item.price || 0);
+                                        const displayPrice = item.price ? formatCurrency(item.price) : '-';
+                                        const displayQty = item.price_per_qty_amount && item.price_per_qty_amount > 1 ? ` per ${item.price_per_qty_amount} ${item.unit}` : ` / ${item.unit}`;
+                                        const totalVal = pricePerUnit * (item.quantity || 0);
+
+                                        return (
+                                            <tr key={item.id} className="hover:bg-slate-800/50 transition-colors group">
+                                                <td className="px-6 py-4 font-medium text-white">
+                                                    {item.name}
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                                                        {item.category || 'General'}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4 font-bold text-white">
+                                                    {item.quantity}
+                                                </td>
+                                                <td className="px-6 py-4 text-slate-400">{item.unit}</td>
+                                                <td className="px-6 py-4 text-slate-400">
+                                                    {displayPrice}
+                                                    <span className="text-xs text-slate-500 block">{displayQty}</span>
+                                                </td>
+                                                <td className="px-6 py-4 text-right font-medium text-emerald-400">
+                                                    {item.price ? formatCurrency(totalVal) : '-'}
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    {item.purchase_link ? (
+                                                        <a
+                                                            href={item.purchase_link}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="inline-flex items-center gap-1 text-indigo-400 hover:text-indigo-300 hover:underline text-xs"
+                                                        >
+                                                            Buka Link <ExternalLink className="w-3 h-3" />
+                                                        </a>
+                                                    ) : (
+                                                        <span className="text-slate-600 text-xs">-</span>
+                                                    )}
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <div className="flex items-center justify-center gap-2">
+                                                        <button
+                                                            onClick={() => openRestock(item)}
+                                                            className="p-2 rounded-lg bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 hover:text-emerald-300 transition-all shadow-sm hover:shadow-emerald-500/20"
+                                                            title="Tambah Stok (Belanja)"
+                                                        >
+                                                            <ShoppingCart className="w-4 h-4" />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => openEdit(item)}
+                                                            className="p-2 rounded-lg bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20 hover:text-indigo-300 transition-all"
+                                                            title="Edit Detail"
+                                                        >
+                                                            <Edit className="w-4 h-4" />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleDelete(item.id, item.name)}
+                                                            className="p-2 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 hover:text-red-300 transition-all"
+                                                            title="Hapus Bahan"
+                                                        >
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                    {filtered.length === 0 && (
+                                        <tr>
+                                            <td colSpan="8" className="px-6 py-12 text-center text-slate-500">
+                                                <div className="flex flex-col items-center gap-2">
+                                                    <Package className="w-10 h-10 opacity-20" />
+                                                    <p>Data bahan baku kosong atau tidak ditemukan</p>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
