@@ -38,7 +38,8 @@ function MaterialsList({ onUpdate }) {
         price: '',
         price_per_qty_amount: '1',
         min_stock: '10',
-        purchase_link: ''
+        purchase_link: '',
+        bottle_volume: ''
     });
 
     // Autocomplete State
@@ -109,9 +110,16 @@ function MaterialsList({ onUpdate }) {
         setLoading(true);
 
         try {
+            let finalName = formData.name.trim();
+            if ((formData.category || '').toLowerCase().includes('botol') && formData.bottle_volume) {
+                // Ensure no accidental duplicated volume strings are appended
+                finalName = finalName.replace(/ \[\d+(?:\.\d+)?\s*(?:ml|gr)\]$/i, '');
+                finalName = `${finalName} [${formData.bottle_volume}ml]`;
+            }
+
             const payload = {
                 user_id: ownerId,
-                name: formData.name,
+                name: finalName,
                 quantity: parseFloat(formData.quantity),
                 unit: formData.unit,
                 category: formData.category || 'General',
@@ -262,22 +270,28 @@ function MaterialsList({ onUpdate }) {
             price: '',
             price_per_qty_amount: '1',
             min_stock: '10',
-            purchase_link: ''
+            purchase_link: '',
+            bottle_volume: ''
         });
         setEditingItem(null);
     };
 
     const openEdit = (item) => {
         setEditingItem(item);
+        const volumeMatch = item.name.match(/ \[(\d+(?:\.\d+)?)\s*(?:ml|gr)\]$/i);
+        const extractedVolume = volumeMatch ? volumeMatch[1] : '';
+        const cleanName = volumeMatch ? item.name.replace(volumeMatch[0], '') : item.name;
+
         setFormData({
-            name: item.name,
+            name: cleanName,
             quantity: item.quantity,
             unit: item.unit,
             category: item.category || '',
             price: item.price || '',
             price_per_qty_amount: item.price_per_qty_amount || '1',
             min_stock: item.min_stock || 10,
-            purchase_link: item.purchase_link || ''
+            purchase_link: item.purchase_link || '',
+            bottle_volume: extractedVolume
         });
         setIsDialogOpen(true);
     };
@@ -573,6 +587,25 @@ function MaterialsList({ onUpdate }) {
                                         <Label>Min. Stok</Label>
                                         <Input type="number" step="0.01" className="bg-slate-800 border-slate-600 focus-visible:ring-indigo-500" value={formData.min_stock} onChange={e => setFormData({ ...formData, min_stock: e.target.value })} />
                                     </div>
+
+                                    {(formData.category || '').toLowerCase().includes('botol') && (
+                                        <div className="space-y-2 col-span-2 bg-indigo-500/10 p-4 rounded-lg border border-indigo-500/20">
+                                            <Label className="text-indigo-400">Kapasitas Botol (ml) *</Label>
+                                            <div className="flex items-center gap-2">
+                                                <Input
+                                                    type="number"
+                                                    step="0.01"
+                                                    className="bg-slate-800 border-indigo-500/30 focus-visible:ring-indigo-500 text-indigo-100"
+                                                    placeholder="Contoh: 50"
+                                                    value={formData.bottle_volume}
+                                                    onChange={e => setFormData({ ...formData, bottle_volume: e.target.value })}
+                                                    required
+                                                />
+                                                <span className="text-sm text-indigo-300 font-medium">ml</span>
+                                            </div>
+                                            <p className="text-xs text-indigo-300 mt-1">Ukuran botol ini akan digunakan otomatis saat proses pembotolan mengurangi stok bahan.</p>
+                                        </div>
+                                    )}
 
                                     <div className="space-y-2 col-span-2 border-t border-slate-700 pt-4 mt-2">
                                         <Label className="text-indigo-400 font-semibold mb-2 block">Informasi Pembelian</Label>

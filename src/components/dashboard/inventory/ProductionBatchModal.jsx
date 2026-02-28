@@ -461,7 +461,18 @@ const ProductionBatchModal = ({ isOpen, onClose, ownerId }) => {
                                                 <select
                                                     className="w-full bg-slate-800 border-slate-700 text-sm text-slate-200 rounded-md py-2 px-3 focus:outline-none focus:ring-1 focus:ring-pink-500"
                                                     value={bottlingForm.bottleMaterialId}
-                                                    onChange={e => setBottlingForm({ ...bottlingForm, bottleMaterialId: e.target.value })}
+                                                    onChange={e => {
+                                                        const botId = e.target.value;
+                                                        const updates = { bottleMaterialId: botId };
+                                                        if (botId) {
+                                                            const chosen = bottleMaterials.find(m => m.id === botId);
+                                                            const match = chosen?.name.match(/ \[(\d+(?:\.\d+)?)\s*(?:ml|gr)\]$/i);
+                                                            if (match) {
+                                                                updates.size = match[1];
+                                                            }
+                                                        }
+                                                        setBottlingForm({ ...bottlingForm, ...updates });
+                                                    }}
                                                 >
                                                     <option value="">-- Pilih Botol --</option>
                                                     {bottleMaterials.map(mat => (
