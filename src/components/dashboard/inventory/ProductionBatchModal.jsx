@@ -295,13 +295,13 @@ const ProductionBatchModal = ({ isOpen, onClose, ownerId }) => {
         }
     };
 
-    // Calculate derived stats
     const getBatchStats = (batch) => {
         const totalVolume = parseFloat(batch.quantity) || 0;
         const logs = batch.bottling_log || [];
         const totalBottled = logs.reduce((acc, curr) => acc + (parseFloat(curr.total_ml) || 0), 0);
+        const totalBottlesCount = logs.reduce((acc, curr) => acc + (parseFloat(curr.bottle_count) || 0), 0);
         const remaining = totalVolume - totalBottled;
-        return { totalVolume, totalBottled, remaining, logs };
+        return { totalVolume, totalBottled, remaining, logs, totalBottlesCount };
     };
 
     const filteredBatches = batches.filter(batch => {
@@ -446,7 +446,14 @@ const ProductionBatchModal = ({ isOpen, onClose, ownerId }) => {
                                             </div>
                                             <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl">
                                                 <p className="text-xs text-slate-500 uppercase font-bold tracking-wider mb-1">Sudah Dibotolkan</p>
-                                                <p className="text-xl font-bold text-indigo-400">{stats.totalBottled.toLocaleString()} <span className="text-sm font-normal text-slate-500">ml</span></p>
+                                                <p className="text-xl font-bold text-indigo-400">
+                                                    {stats.totalBottled.toLocaleString()} <span className="text-sm font-normal text-slate-500">ml</span>
+                                                    {stats.totalBottlesCount > 0 && (
+                                                        <span className="text-sm font-normal text-slate-500 ml-1.5 opacity-80">
+                                                            ({stats.totalBottlesCount.toLocaleString()} botol)
+                                                        </span>
+                                                    )}
+                                                </p>
                                             </div>
                                             <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl">
                                                 <p className="text-xs text-slate-500 uppercase font-bold tracking-wider mb-1">Sisa Volume</p>
