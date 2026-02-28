@@ -1,0 +1,7 @@
+## Pages
+- [- Our Store](/productdetail): No description available
+- [Dashboard - Stokcer](/dashboard): Stokcer Dashboard for managing inventory, production, and sales.
+- [Order Successful - Stokcer Store](/success): No description available
+- [Pricing Plans - Stokcer](/subscriptionplans): No description available
+- [Stokcer - Financial Control & Inventory System](/landing): Stop financial leaks. Track capital, monitor employees, and manage inventory with precision.
+- [Stokcer Store - Premium Products](/store): Browse our exclusive collection of premium products.
