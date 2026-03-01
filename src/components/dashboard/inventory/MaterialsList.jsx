@@ -786,21 +786,32 @@ function MaterialsList({ onUpdate }) {
                                         const displayPrice = item.price ? formatCurrency(item.price) : '-';
                                         const displayQty = item.price_per_qty_amount && item.price_per_qty_amount > 1 ? ` per ${item.price_per_qty_amount} ${item.unit}` : ` / ${item.unit}`;
                                         const totalVal = pricePerUnit * (item.quantity || 0);
+                                        const isLowStock = (item.quantity || 0) <= (item.min_stock || 0);
 
                                         return (
-                                            <tr key={item.id} className="hover:bg-slate-800/50 transition-colors group">
-                                                <td className="px-6 py-4 font-medium text-white">
-                                                    {item.name}
+                                            <tr key={item.id} className={`hover:bg-slate-800/50 transition-colors group ${isLowStock ? 'bg-red-500/5' : ''}`}>
+                                                <td className={`px-6 py-4 font-medium ${isLowStock ? 'text-red-400' : 'text-white'}`}>
+                                                    <div className="flex items-center gap-2">
+                                                        {item.name}
+                                                        {isLowStock && (
+                                                            <TooltipProvider>
+                                                                <Tooltip>
+                                                                    <TooltipTrigger><AlertTriangle className="w-3.5 h-3.5 text-red-500" /></TooltipTrigger>
+                                                                    <TooltipContent className="bg-slate-900 border-slate-700 text-red-400 text-[10px]">Stok di bawah batas minimum ({item.min_stock})</TooltipContent>
+                                                                </Tooltip>
+                                                            </TooltipProvider>
+                                                        )}
+                                                    </div>
                                                 </td>
                                                 <td className="px-6 py-4">
-                                                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                                                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border ${isLowStock ? 'bg-red-500/10 text-red-400 border-red-500/20' : 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20'}`}>
                                                         {item.category || 'General'}
                                                     </span>
                                                 </td>
-                                                <td className="px-6 py-4 font-bold text-white">
-                                                    {item.quantity}
+                                                <td className={`px-6 py-4 font-bold ${isLowStock ? 'text-red-400 animate-pulse' : 'text-white'}`}>
+                                                    {parseFloat(item.quantity || 0).toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
                                                 </td>
-                                                <td className="px-6 py-4 text-slate-400">{item.unit}</td>
+                                                <td className={`px-6 py-4 ${isLowStock ? 'text-red-400/70' : 'text-slate-400'}`}>{item.unit}</td>
                                                 <td className="px-6 py-4 text-slate-400">
                                                     {displayPrice}
                                                     <span className="text-xs text-slate-500 block">{displayQty}</span>
