@@ -101,9 +101,10 @@ function NewProduction({ onUpdate }) {
             }
         }
 
-        const ratio = totalBatchVolumeMl / baseOutput;
+        const ratio = totalBatchVolumeMl / (baseOutput || 100);
 
-        // 1. Map Ingredients to simplified objects
+        if (!r.recipe_ingredients) return null;
+
         const ingredients = r.recipe_ingredients.map(ing => {
             const mat = materials.find(m => m.id === ing.material_id);
             const reqQty = ratio * ing.quantity;
@@ -112,6 +113,7 @@ function NewProduction({ onUpdate }) {
                 const subRecipe = recipes.find(sr => sr.id === ing.ingredient_recipe_id);
                 return {
                     name: subRecipe?.name || 'Sub-Recipe',
+                    materialId: ing.ingredient_recipe_id,
                     unit: 'unit',
                     reqQty: reqQty,
                     stock: 999999,
@@ -167,6 +169,7 @@ function NewProduction({ onUpdate }) {
 
             return {
                 name: mat?.name || 'Unknown Material',
+                materialId: mat?.id,
                 unit: mat?.unit || 'ml',
                 reqQty: finalReqQty,
                 volMl: reqQty,
@@ -248,11 +251,14 @@ function NewProduction({ onUpdate }) {
         setLoading(true);
 
         try {
+            const r = recipes.find(x => x.id === selectedRecipe);
+            if (!r) throw new Error("Resep tidak ditemukan");
+
             const baseOutput = r.output_quantity || 100;
             const ratio = currentTotalVolumeMl / baseOutput;
 
             const ingredientsPayload = calculationData.rawIngredients.map(ing => {
-                const mat = materials.find(m => m.name === ing.name); // Using name for payload as reqQty is already adjusted
+                const mat = materials.find(m => m.id === ing.materialId || m.name === ing.name);
                 return {
                     materialId: mat?.id,
                     quantity: ing.reqQty,
@@ -266,7 +272,13 @@ function NewProduction({ onUpdate }) {
                 p_batch_quantity: ratio,
                 p_user_id: user.id,
                 p_ingredients_json: ingredientsPayload,
-                p_metadata: { totalCost: calculationData.totalCost }
+                p_metadata: {
+                    totalCost: calculationData.totalCost,
+                    totalVolume: currentTotalVolumeMl,
+                    totalWeight: currentTotalWeightGr,
+                    inputUnit: inputUnit,
+                    inputQuantity: parseFloat(quantity)
+                }
             });
 
             if (error) throw error;
