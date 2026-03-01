@@ -128,10 +128,11 @@ function NewProduction({ onUpdate }) {
             }
 
             const isDeleted = !!mat?.deleted_at;
+            const lowerName = (mat?.name || '').toLowerCase();
 
             // Price Calculation
             const pricePerUnitBase = (mat?.price_per_qty_amount && mat.price_per_qty_amount > 0)
-                ? (mat.price / mat.price_per_qty_amount)
+                ? ((mat.price || 0) / mat.price_per_qty_amount)
                 : (mat?.price || 0);
 
             // 2. Identify Category
@@ -142,7 +143,6 @@ function NewProduction({ onUpdate }) {
                 else if (meta.alcoholId === mat?.id) category = 'Pelarut';
                 else if (meta.bibitMaterials?.some(b => b.id === mat?.id)) category = 'Bibit';
             } else {
-                const lowerName = (mat?.name || '').toLowerCase();
                 if (category === 'General' || !category) {
                     if (lowerName.includes('alkohol') || lowerName.includes('absolute') || lowerName.includes('ethanol') || lowerName.includes('solvent')) category = 'Pelarut';
                     else if (lowerName.includes('fixative')) category = 'Fixative';
