@@ -315,7 +315,17 @@ function RecipeGrid({ onUpdate }) {
     const handleSectionChange = (id, field, value) => {
         setWizardData(prev => ({
             ...prev,
-            sections: prev.sections.map(s => s.id === id ? { ...s, [field]: value } : s)
+            sections: prev.sections.map(s => {
+                if (s.id === id) {
+                    const updated = { ...s, [field]: value };
+                    // Ensure materials array exists if switching to multi
+                    if (field === 'type' && value === 'multi' && (!updated.materials || !Array.isArray(updated.materials))) {
+                        updated.materials = [];
+                    }
+                    return updated;
+                }
+                return s;
+            })
         }));
     };
 
@@ -511,50 +521,47 @@ function RecipeGrid({ onUpdate }) {
 
             if (methodType === 'wizard') {
                 console.log("New Metadata:", metadata);
-                // 1. Compare Main Percentages
-                if (String(oldMetadata.bibitPercent) !== String(metadata.bibitPercent)) {
-                    changes.push({ material: 'Bibit', old: `${oldMetadata.bibitPercent || 0}%`, new: `${metadata.bibitPercent}%` });
-                }
-                if (String(oldMetadata.fixativePercent) !== String(metadata.fixativePercent)) {
-                    changes.push({ material: 'Fixative', old: `${oldMetadata.fixativePercent || 0}%`, new: `${metadata.fixativePercent}%` });
-                }
-                if (String(oldMetadata.alcoholPercent) !== String(metadata.alcoholPercent)) {
-                    changes.push({ material: 'Alkohol', old: `${oldMetadata.alcoholPercent || 0}%`, new: `${metadata.alcoholPercent}%` });
-                }
+                // Compare Sections
+                const newSections = metadata.sections || [];
+                const oldSections = oldMetadata.sections || [];
 
-                // 2. Compare Inner Bibit Materials
-                const newBibitMap = new Map(metadata.bibitMaterials.map(m => [String(m.id), String(m.percent_share)]));
-                const oldBibitMap = new Map((oldMetadata.bibitMaterials || []).map(m => [String(m.id), String(m.percent_share)]));
+                newSections.forEach(newSec => {
+                    const oldSec = oldSections.find(s => s.id === newSec.id) ||
+                        oldSections.find(s => s.name === newSec.name); // Fallback for migrated old recipes
 
-                // Check added or changed (in new map)
-                newBibitMap.forEach((newPct, id) => {
-                    const oldPct = oldBibitMap.get(id);
-                    const matName = rawMaterials.find(m => m.id === id)?.name || 'Unknown';
+                    if (!oldSec) {
+                        changes.push({ material: `Kolom Baru: ${newSec.name}`, old: '-', new: `${newSec.percent}%` });
+                    } else {
+                        if (String(oldSec.percent) !== String(newSec.percent)) {
+                            changes.push({ material: `Kategori ${newSec.name}`, old: `${oldSec.percent}%`, new: `${newSec.percent}%` });
+                        }
 
-                    // Compare numbers safely to avoid "70" vs "70.0" mismatch issues
-                    // But maintain sensitivity to actual changes "70" vs "69"
-                    const oldVal = parseFloat(oldPct || 0);
-                    const newVal = parseFloat(newPct || 0);
+                        if (newSec.type === 'multi') {
+                            const newMats = newSec.materials || [];
+                            const oldMats = oldSec.materials || [];
 
-                    if (oldPct === undefined) {
-                        console.log(`Bibit Material Added: ${matName} (${newPct}%)`);
-                        changes.push({ material: `Komposisi Bibit: ${matName}`, old: '0%', new: `${newPct}%` });
-                    } else if (Math.abs(oldVal - newVal) > 0.01) {
-                        console.log(`Bibit Material Changed: ${matName} (${oldPct}% -> ${newPct}%)`);
-                        changes.push({ material: `Komposisi Bibit: ${matName}`, old: `${oldPct}%`, new: `${newPct}%` });
+                            newMats.forEach(nm => {
+                                const om = oldMats.find(m => m.id === nm.id);
+                                if (!om) {
+                                    const mName = rawMaterials.find(m => m.id === nm.id)?.name || 'Bahan';
+                                    changes.push({ material: `Tambah ke ${newSec.name}: ${mName}`, old: '0%', new: `${nm.percent_share}%` });
+                                } else if (String(om.percent_share) !== String(nm.percent_share)) {
+                                    const mName = rawMaterials.find(m => m.id === nm.id)?.name || 'Bahan';
+                                    changes.push({ material: `Ubah di ${newSec.name}: ${mName}`, old: `${om.percent_share}%`, new: `${nm.percent_share}%` });
+                                }
+                            });
+                        }
                     }
                 });
 
-                // Check removed (in old map but not in new)
-                oldBibitMap.forEach((oldPct, id) => {
-                    if (!newBibitMap.has(id)) {
-                        const matName = rawMaterials.find(m => m.id === id)?.name || 'Unknown';
-                        console.log(`Bibit Material Removed: ${matName}`);
-                        changes.push({ material: `Komposisi Bibit: ${matName}`, old: `${oldPct}%`, new: '0%' });
+                // Check for removed sections
+                oldSections.forEach(oldSec => {
+                    if (!newSections.find(s => s.id === oldSec.id)) {
+                        changes.push({ material: `Hapus Kolom: ${oldSec.name}`, old: `${oldSec.percent}%`, new: '0%' });
                     }
                 });
 
-                // 3. Compare Additional Materials
+                // Compare Additional Materials
                 const newAdditionalMap = new Map((metadata.additionalMaterials || []).map(m => [String(m.id), String(m.quantity)]));
                 const oldAdditionalMap = new Map((oldMetadata.additionalMaterials || []).map(m => [String(m.id), String(m.quantity)]));
 
@@ -828,14 +835,14 @@ function RecipeGrid({ onUpdate }) {
 
                                             {sec.type === 'multi' ? (
                                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                                    {sec.materials.map((mat, idx) => (
+                                                    {(sec.materials || []).map((mat, idx) => (
                                                         <div key={idx} className="flex gap-2 items-center bg-slate-900/50 p-2 rounded-lg border border-slate-700/50 shadow-inner">
                                                             <select className="flex-1 h-8 rounded border-none bg-transparent text-xs text-slate-200" value={mat.id} onChange={e => handleBibitSectionMaterialChange(sec.id, idx, 'id', e.target.value)}>
                                                                 <option value="" className="bg-slate-900">Pilih...</option>
                                                                 {rawMaterials.filter(m => !m.deleted_at).map(m => <option key={m.id} value={m.id} className="bg-slate-900">{m.name}</option>)}
                                                             </select>
-                                                            <div className="w-16 relative">
-                                                                <Input type="number" placeholder="%" className="h-8 bg-slate-800 border-none text-xs pr-4 text-center font-bold" value={mat.percent_share} onChange={e => handleBibitSectionMaterialChange(sec.id, idx, 'percent_share', e.target.value)} />
+                                                            <div className="w-24 relative">
+                                                                <Input type="number" placeholder="%" className="h-8 bg-slate-800 border-none text-xs pr-6 text-center font-bold text-slate-100" value={mat.percent_share} onChange={e => handleBibitSectionMaterialChange(sec.id, idx, 'percent_share', e.target.value)} />
                                                                 <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-500 font-bold">%</span>
                                                             </div>
                                                             <button type="button" onClick={() => handleRemoveBibitSectionMaterial(sec.id, idx)} className="text-slate-500 hover:text-red-400 transition-colors p-1"><Trash2 className="w-3.5 h-3.5" /></button>
