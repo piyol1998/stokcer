@@ -10,6 +10,8 @@ import { logNotification } from '@/lib/notificationUtils';
 import { getColorForString } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
+const ETHANOL_DENSITY = 0.755; // 1ml = 0.755gr per user's specific requirement
+
 function NewProduction({ onUpdate }) {
     const { user } = useAuth();
     const { toast } = useToast();
@@ -88,6 +90,7 @@ function NewProduction({ onUpdate }) {
                 ? (mat.price / mat.price_per_qty_amount)
                 : (mat?.price || 0);
 
+            // 2. Identify Category
             let category = mat?.category || 'General';
             if (r.method === 'wizard' && r.metadata) {
                 const meta = r.metadata;
@@ -97,21 +100,39 @@ function NewProduction({ onUpdate }) {
             } else {
                 const lowerName = (mat?.name || '').toLowerCase();
                 if (category === 'General' || !category) {
-                    if (lowerName.includes('alkohol') || lowerName.includes('absolute') || lowerName.includes('solvent')) category = 'Pelarut';
+                    if (lowerName.includes('alkohol') || lowerName.includes('absolute') || lowerName.includes('ethanol') || lowerName.includes('solvent')) category = 'Pelarut';
                     else if (lowerName.includes('fixative')) category = 'Fixative';
                     else category = 'Bibit';
+                }
+            }
+
+            // 3. APPLY DENSITY CONVERSION (ml to gr)
+            // If the resep is interpreted as ml (volume batch), and stock is in mass (gr/kg)
+            let finalReqQty = reqQty;
+            let isConverted = false;
+            let originalMl = 0;
+
+            if (mat && (mat.unit === 'gr' || mat.unit === 'kg')) {
+                const lowerName = (mat.name || '').toLowerCase();
+                // We apply the density specifically to Ethanol/Solvents if requested
+                if (category === 'Pelarut' || lowerName.includes('ethanol') || lowerName.includes('alkohol')) {
+                    originalMl = reqQty;
+                    finalReqQty = reqQty * ETHANOL_DENSITY;
+                    if (mat.unit === 'kg') finalReqQty /= 1000;
+                    isConverted = true;
                 }
             }
 
             return {
                 name: mat?.name || 'Unknown Material',
                 unit: mat?.unit,
-                reqQty: reqQty,
+                reqQty: finalReqQty,
+                originalMl: isConverted ? originalMl : null,
                 stock: mat?.quantity || 0,
-                isEnough: (mat?.quantity || 0) >= reqQty && !isDeleted,
+                isEnough: (mat?.quantity || 0) >= finalReqQty && !isDeleted,
                 category: category,
                 isDeleted: isDeleted,
-                cost: reqQty * pricePerUnitBase
+                cost: finalReqQty * pricePerUnitBase
             };
         });
 
@@ -181,13 +202,13 @@ function NewProduction({ onUpdate }) {
             const baseOutput = r.output_quantity || 100;
             const ratio = parseFloat(quantity) / baseOutput;
 
-            const ingredientsPayload = r.recipe_ingredients.map(ing => {
-                const mat = materials.find(m => m.id === ing.material_id);
+            const ingredientsPayload = calculationData.rawIngredients.map(ing => {
+                const mat = materials.find(m => m.name === ing.name); // Using name for payload as reqQty is already adjusted
                 return {
-                    materialId: ing.material_id,
-                    quantity: ratio * ing.quantity,
-                    materialName: mat?.name,
-                    unit: mat?.unit
+                    materialId: mat?.id,
+                    quantity: ing.reqQty,
+                    materialName: ing.name,
+                    unit: ing.unit
                 }
             });
 
@@ -440,6 +461,18 @@ function NewProduction({ onUpdate }) {
                                                             <p className={`text-sm font-medium truncate ${item.isDeleted ? 'line-through text-red-400' : 'text-slate-200'}`}>
                                                                 {item.name}
                                                             </p>
+                                                            {item.originalMl && (
+                                                                <TooltipProvider>
+                                                                    <Tooltip>
+                                                                        <TooltipTrigger>
+                                                                            <Info className="w-3 h-3 text-blue-400 opacity-60" />
+                                                                        </TooltipTrigger>
+                                                                        <TooltipContent className="bg-slate-900 border-slate-700 text-[10px]">
+                                                                            Konversi Density: {item.originalMl.toFixed(1)} ml = {item.reqQty.toFixed(1)} {item.unit}
+                                                                        </TooltipContent>
+                                                                    </Tooltip>
+                                                                </TooltipProvider>
+                                                            )}
                                                         </div>
                                                         <div className="flex items-center gap-3 text-xs text-slate-500">
                                                             <span>Req: <span className="text-slate-400">{item.reqQty.toFixed(1)} {item.unit}</span></span>
@@ -467,6 +500,51 @@ function NewProduction({ onUpdate }) {
                                 <div className="text-right">
                                     <span>Calculated for <strong className="text-slate-300">{totalBottles} bottles</strong></span>
                                 </div>
+                            </div>
+
+                            {/* Standalone Ethanol Density Converter Widget */}
+                            <div className="mt-8 p-4 bg-blue-500/5 border border-blue-500/20 rounded-xl">
+                                <div className="flex items-center gap-2 mb-3">
+                                    <HelpCircle className="w-4 h-4 text-blue-400" />
+                                    <h4 className="text-xs font-bold text-blue-400 uppercase tracking-widest">Kalkulator Density</h4>
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-1">
+                                        <Label className="text-[10px] text-slate-500 uppercase">Input Volume (ml)</Label>
+                                        <div className="relative">
+                                            <Input
+                                                id="conv-ml"
+                                                type="number"
+                                                className="h-8 bg-slate-900 border-slate-700 text-xs text-white"
+                                                placeholder="ml"
+                                                onChange={(e) => {
+                                                    const gr = document.getElementById('conv-gr');
+                                                    if (gr) gr.value = (parseFloat(e.target.value) * ETHANOL_DENSITY).toFixed(2);
+                                                }}
+                                            />
+                                            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-slate-500">ml</span>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label className="text-[10px] text-slate-500 uppercase">Input Mass (gr)</Label>
+                                        <div className="relative">
+                                            <Input
+                                                id="conv-gr"
+                                                type="number"
+                                                className="h-8 bg-slate-900 border-slate-700 text-xs text-white"
+                                                placeholder="gr"
+                                                onChange={(e) => {
+                                                    const ml = document.getElementById('conv-ml');
+                                                    if (ml) ml.value = (parseFloat(e.target.value) / ETHANOL_DENSITY).toFixed(2);
+                                                }}
+                                            />
+                                            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-slate-500">gr</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <p className="mt-2 text-[9px] text-slate-500 italic">
+                                    * Density Ethanol: 1ml = {ETHANOL_DENSITY}gr. Otomatis diterapkan pada kalkulasi stok Ethanol.
+                                </p>
                             </div>
                         </div>
                     )}
