@@ -547,14 +547,23 @@ function NewProduction({ onUpdate }) {
                                                             </p>
                                                         </div>
                                                         <div className="flex items-center gap-3 text-xs text-slate-500">
-                                                            <span>Req: <span className="text-slate-300 font-bold">{item.reqQty.toFixed(1)} {item.unit}</span></span>
-                                                            {item.altQty && (
-                                                                <span className="text-indigo-400 bg-indigo-500/5 px-1.5 rounded border border-indigo-500/10 text-[10px]">
-                                                                    ≈ {item.altQty.toFixed(1)} {item.altUnit}
-                                                                </span>
+                                                            {inputUnit === 'gr' ? (
+                                                                <>
+                                                                    <span>Req: <span className="text-slate-300 font-bold">{item.massGr.toFixed(1)} gr</span></span>
+                                                                    <span className="text-indigo-400 bg-indigo-500/5 px-1.5 rounded border border-indigo-500/10 text-[10px]">
+                                                                        ≈ {item.volMl.toFixed(1)} ml
+                                                                    </span>
+                                                                </>
+                                                            ) : (
+                                                                <>
+                                                                    <span>Req: <span className="text-slate-300 font-bold">{item.volMl.toFixed(1)} ml</span></span>
+                                                                    <span className="text-indigo-400 bg-indigo-500/5 px-1.5 rounded border border-indigo-500/10 text-[10px]">
+                                                                        ≈ {item.massGr.toFixed(1)} gr
+                                                                    </span>
+                                                                </>
                                                             )}
                                                             {!item.isEnough && (
-                                                                <span className="text-red-400 bg-red-500/10 px-1.5 rounded font-bold">
+                                                                <span className="text-red-400 bg-red-500/10 px-1.5 rounded font-bold ml-1">
                                                                     Kurang: {(item.reqQty - item.stock).toFixed(1)} {item.unit}
                                                                 </span>
                                                             )}
