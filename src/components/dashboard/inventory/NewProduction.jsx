@@ -542,28 +542,28 @@ function NewProduction({ onUpdate }) {
                                                     <div className="flex-1 min-w-0 mr-4">
                                                         <div className="flex items-center gap-2 mb-1">
                                                             <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${item.isEnough ? 'bg-emerald-500' : 'bg-red-500 animate-pulse'}`}></div>
-                                                            <p className={`text-sm font-medium truncate ${item.isDeleted ? 'line-through text-red-400' : 'text-slate-200'}`}>
+                                                            <p className={`text-base font-semibold truncate ${item.isDeleted ? 'line-through text-red-400' : 'text-slate-100'}`}>
                                                                 {item.name}
                                                             </p>
                                                         </div>
-                                                        <div className="flex items-center gap-3 text-xs text-slate-500">
+                                                        <div className="flex items-center gap-3 text-sm text-slate-400">
                                                             {inputUnit === 'gr' ? (
                                                                 <>
-                                                                    <span>Req: <span className="text-slate-300 font-bold">{item.massGr.toFixed(1)} gr</span></span>
-                                                                    <span className="text-indigo-400 bg-indigo-500/5 px-1.5 rounded border border-indigo-500/10 text-[10px]">
+                                                                    <span>Req: <span className="text-white font-black text-base">{item.massGr.toFixed(1)} gr</span></span>
+                                                                    <span className="text-indigo-300 bg-indigo-500/10 px-2 py-0.5 rounded border border-indigo-500/20 text-xs font-medium">
                                                                         ≈ {item.volMl.toFixed(1)} ml
                                                                     </span>
                                                                 </>
                                                             ) : (
                                                                 <>
-                                                                    <span>Req: <span className="text-slate-300 font-bold">{item.volMl.toFixed(1)} ml</span></span>
-                                                                    <span className="text-indigo-400 bg-indigo-500/5 px-1.5 rounded border border-indigo-500/10 text-[10px]">
+                                                                    <span>Req: <span className="text-white font-black text-base">{item.volMl.toFixed(1)} ml</span></span>
+                                                                    <span className="text-indigo-300 bg-indigo-500/10 px-2 py-0.5 rounded border border-indigo-500/20 text-xs font-medium">
                                                                         ≈ {item.massGr.toFixed(1)} gr
                                                                     </span>
                                                                 </>
                                                             )}
                                                             {!item.isEnough && (
-                                                                <span className="text-red-400 bg-red-500/10 px-1.5 rounded font-bold ml-1">
+                                                                <span className="text-red-400 bg-red-500/10 px-2 py-0.5 rounded font-bold text-xs ml-1 border border-red-500/20">
                                                                     Kurang: {(item.reqQty - item.stock).toFixed(1)} {item.unit}
                                                                 </span>
                                                             )}
