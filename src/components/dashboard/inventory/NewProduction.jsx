@@ -63,11 +63,21 @@ function NewProduction({ onUpdate }) {
 
         const baseOutput = r.output_quantity || 100;
         let totalBatchVolumeMl = 0;
+        let totalBatchWeightGr = 0;
 
         if (quantity) {
             const val = parseFloat(quantity);
             if (inputUnit === 'ml') {
                 totalBatchVolumeMl = val;
+                const baseIngredients = r.recipe_ingredients.map(ing => {
+                    const mat = materials.find(m => m.id === ing.material_id);
+                    const isAlcohol = (mat?.category === 'Pelarut' || (mat?.name || '').toLowerCase().includes('ethanol') || (mat?.name || '').toLowerCase().includes('alkohol'));
+                    const density = isAlcohol ? ETHANOL_DENSITY : BIBIT_DENSITY;
+                    return { qty: ing.quantity, density };
+                });
+                const baseWeight = baseIngredients.reduce((sum, i) => sum + (i.qty * i.density), 0);
+                const baseVol = baseIngredients.reduce((sum, i) => sum + i.qty, 0);
+                totalBatchWeightGr = (val / (baseVol || 1)) * baseWeight;
             } else {
                 // Converting Gram to ML for the whole batch
                 // We need to know the ratio to calculate merged density
@@ -84,9 +94,10 @@ function NewProduction({ onUpdate }) {
                 });
                 const baseWeight = baseIngredients.reduce((sum, i) => sum + (i.qty * i.density), 0);
                 const baseVol = baseIngredients.reduce((sum, i) => sum + i.qty, 0);
-                const mergedDensity = baseWeight / baseVol;
 
-                totalBatchVolumeMl = val / mergedDensity;
+                totalBatchWeightGr = val;
+                const mergedDensity = baseWeight / (baseVol || 1);
+                totalBatchVolumeMl = val / (mergedDensity || 1);
             }
         }
 
@@ -135,28 +146,33 @@ function NewProduction({ onUpdate }) {
                 }
             }
 
-            // 3. APPLY DENSITY CONVERSION (ml to gr)
-            // If the resep is interpreted as ml (volume batch), and stock is in mass (gr/kg)
-            let finalReqQty = reqQty;
-            let isConverted = false;
-            let originalMl = 0;
+            const density = (category === 'Pelarut' || lowerName.includes('ethanol')) ? ETHANOL_DENSITY : BIBIT_DENSITY;
+            const massGr = reqQty * density;
 
-            if (mat && (mat.unit === 'gr' || mat.unit === 'kg')) {
-                const lowerName = (mat.name || '').toLowerCase();
-                // We apply the density specifically to Ethanol/Solvents if requested
-                if (category === 'Pelarut' || lowerName.includes('ethanol') || lowerName.includes('alkohol')) {
-                    originalMl = reqQty;
-                    finalReqQty = reqQty * ETHANOL_DENSITY;
-                    if (mat.unit === 'kg') finalReqQty /= 1000;
-                    isConverted = true;
-                }
+            let finalReqQty = reqQty;
+            let altQty = massGr;
+            let altUnit = 'gr';
+
+            if (mat?.unit === 'gr' || mat?.unit === 'kg') {
+                finalReqQty = massGr;
+                if (mat.unit === 'kg') finalReqQty /= 1000;
+                altQty = reqQty;
+                altUnit = 'ml';
+            } else if (mat?.unit === 'ml' || mat?.unit === 'liter') {
+                finalReqQty = reqQty;
+                if (mat.unit === 'liter') finalReqQty /= 1000;
+                altQty = massGr;
+                altUnit = 'gr';
             }
 
             return {
                 name: mat?.name || 'Unknown Material',
-                unit: mat?.unit,
+                unit: mat?.unit || 'ml',
                 reqQty: finalReqQty,
-                originalMl: isConverted ? originalMl : null,
+                volMl: reqQty,
+                massGr: massGr,
+                altQty: altQty,
+                altUnit: altUnit,
                 stock: mat?.quantity || 0,
                 isEnough: (mat?.quantity || 0) >= finalReqQty && !isDeleted,
                 category: category,
@@ -210,7 +226,9 @@ function NewProduction({ onUpdate }) {
             rawIngredients: enrichedIngredients,
             groupedIngredients: groups,
             totalCost: enrichedIngredients.reduce((sum, i) => sum + i.cost, 0),
-            isEnoughTotal: enrichedIngredients.every(i => i.isEnough)
+            isEnoughTotal: enrichedIngredients.every(i => i.isEnough),
+            totalVolumeMl: totalBatchVolumeMl,
+            totalWeightGr: totalBatchWeightGr
         };
     };
 
@@ -219,17 +237,8 @@ function NewProduction({ onUpdate }) {
     const isWizard = currentRecipe?.method === 'wizard';
 
     // Output Calculation
-    const calcVol = calculationData?.rawIngredients.reduce((sum, i) => sum + i.reqQty, 0) || 0; // This will vary if density is applied
-    // Actually totalBottles should use the volume ml
-    // If input was 2964gr and output is ~3400ml, totalBottles should be 3400 / 30
-    const currentTotalVolumeMl = calculationData ? calculationData.rawIngredients.reduce((sum, i) => {
-        // Find if this was converted
-        if (i.originalMl) return sum + i.originalMl;
-        // If not converted (already in ml), use reqQty
-        if (i.unit === 'ml' || i.unit === 'liter') return sum + (i.unit === 'liter' ? i.reqQty * 1000 : i.reqQty);
-        // If it's gr/kg but not identified as pelarut, it was treated as density 1.0 (bibit)
-        return sum + (i.unit === 'kg' ? i.reqQty * 1000 : i.reqQty) / BIBIT_DENSITY;
-    }, 0) : 0;
+    const currentTotalVolumeMl = calculationData ? calculationData.totalVolumeMl : 0;
+    const currentTotalWeightGr = calculationData ? calculationData.totalWeightGr : 0;
 
     const totalBottles = (currentTotalVolumeMl && bottleSize) ? Math.floor(currentTotalVolumeMl / parseFloat(bottleSize)) : 0;
     const costPerBottle = totalBottles > 0 && calculationData ? calculationData.totalCost / totalBottles : 0;
@@ -239,9 +248,8 @@ function NewProduction({ onUpdate }) {
         setLoading(true);
 
         try {
-            const r = recipes.find(x => x.id === selectedRecipe);
             const baseOutput = r.output_quantity || 100;
-            const ratio = parseFloat(quantity) / baseOutput;
+            const ratio = currentTotalVolumeMl / baseOutput;
 
             const ingredientsPayload = calculationData.rawIngredients.map(ing => {
                 const mat = materials.find(m => m.name === ing.name); // Using name for payload as reqQty is already adjusted
@@ -290,7 +298,7 @@ function NewProduction({ onUpdate }) {
                     details: {
                         recipeName: r.name,
                         batchId: batchRef,
-                        quantity: parseFloat(quantity),
+                        quantity: currentTotalVolumeMl,
                         unit: 'ml',
                         totalCost: calculationData.totalCost,
                         userName: userName
@@ -517,23 +525,18 @@ function NewProduction({ onUpdate }) {
                                                             <p className={`text-sm font-medium truncate ${item.isDeleted ? 'line-through text-red-400' : 'text-slate-200'}`}>
                                                                 {item.name}
                                                             </p>
-                                                            {item.originalMl && (
-                                                                <TooltipProvider>
-                                                                    <Tooltip>
-                                                                        <TooltipTrigger>
-                                                                            <Info className="w-3 h-3 text-blue-400 opacity-60" />
-                                                                        </TooltipTrigger>
-                                                                        <TooltipContent className="bg-slate-900 border-slate-700 text-[10px]">
-                                                                            Konversi Density: {item.originalMl.toFixed(1)} ml = {item.reqQty.toFixed(1)} {item.unit}
-                                                                        </TooltipContent>
-                                                                    </Tooltip>
-                                                                </TooltipProvider>
-                                                            )}
                                                         </div>
                                                         <div className="flex items-center gap-3 text-xs text-slate-500">
-                                                            <span>Req: <span className="text-slate-400">{item.reqQty.toFixed(1)} {item.unit}</span></span>
+                                                            <span>Req: <span className="text-slate-300 font-bold">{item.reqQty.toFixed(1)} {item.unit}</span></span>
+                                                            {item.altQty && (
+                                                                <span className="text-indigo-400 bg-indigo-500/5 px-1.5 rounded border border-indigo-500/10 text-[10px]">
+                                                                    ≈ {item.altQty.toFixed(1)} {item.altUnit}
+                                                                </span>
+                                                            )}
                                                             {!item.isEnough && (
-                                                                <span className="text-red-400 bg-red-500/10 px-1.5 rounded">Kurang: {(item.reqQty - item.stock).toFixed(1)}</span>
+                                                                <span className="text-red-400 bg-red-500/10 px-1.5 rounded font-bold">
+                                                                    Kurang: {(item.reqQty - item.stock).toFixed(1)} {item.unit}
+                                                                </span>
                                                             )}
                                                         </div>
                                                     </div>
@@ -549,12 +552,16 @@ function NewProduction({ onUpdate }) {
                             </div>
 
                             {/* Footer Summary */}
-                            <div className="mt-8 pt-4 border-t border-slate-700 flex justify-between items-center text-xs text-slate-500">
-                                <div className="flex gap-4">
-                                    <span>Total Volume: <strong className="text-slate-300">{calculationData.rawIngredients.reduce((s, i) => s + i.reqQty, 0).toFixed(0)} {calculationData.rawIngredients[0]?.unit}</strong></span>
+                            <div className="mt-8 pt-4 border-t border-slate-700 flex justify-between items-end text-[10px] text-slate-500">
+                                <div className="space-y-1">
+                                    <div className="flex gap-4">
+                                        <span>Est. Total Volume: <strong className="text-indigo-400 text-sm">{currentTotalVolumeMl.toFixed(0)} ml</strong></span>
+                                        <span>Est. Total Berat: <strong className="text-emerald-400 text-sm">{currentTotalWeightGr.toFixed(1)} gr</strong></span>
+                                    </div>
+                                    <p className="italic opacity-50">* Berdasarkan Density (Ethanol: {ETHANOL_DENSITY}, Bibit: {BIBIT_DENSITY})</p>
                                 </div>
                                 <div className="text-right">
-                                    <span>Calculated for <strong className="text-slate-300">{totalBottles} bottles</strong></span>
+                                    <span>Calculated for <strong className="text-slate-300 text-sm">{totalBottles} bottles</strong></span>
                                 </div>
                             </div>
 
