@@ -187,12 +187,14 @@ function RecipeGrid({ onUpdate }) {
     });
 
     const availableCategories = React.useMemo(() => {
-        const cats = [...new Set(rawMaterials.map(m => m.category).filter(Boolean))];
-        // Ensure standard ones are prioritized or present
+        // Collect all categories and normalize them to uppercase
+        const normalizedCats = [...new Set(rawMaterials.map(m => (m.category || '').toUpperCase()).filter(Boolean))];
+
+        // Priority for standard categories
         const priority = ['BIBIT', 'ALKOHOL', 'FIXATIVE', 'BOTOL', 'BOX'];
-        return cats.sort((a, b) => {
-            const indexA = priority.indexOf(a.toUpperCase());
-            const indexB = priority.indexOf(b.toUpperCase());
+        return normalizedCats.sort((a, b) => {
+            const indexA = priority.indexOf(a);
+            const indexB = priority.indexOf(b);
             if (indexA !== -1 && indexB !== -1) return indexA - indexB;
             if (indexA !== -1) return -1;
             if (indexB !== -1) return 1;
