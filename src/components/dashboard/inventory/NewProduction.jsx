@@ -11,6 +11,7 @@ import { getColorForString } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 const ETHANOL_DENSITY = 0.755; // 1ml = 0.755gr per user's specific requirement
+const BIBIT_DENSITY = 1.0;    // 1ml = 1.0gr (Average for fragrance oils)
 
 function NewProduction({ onUpdate }) {
     const { user } = useAuth();
@@ -20,7 +21,8 @@ function NewProduction({ onUpdate }) {
     const [selectedRecipe, setSelectedRecipe] = useState('');
 
     // Production Inputs
-    const [quantity, setQuantity] = useState(''); // Total Quantity in ml/unit
+    const [quantity, setQuantity] = useState(''); // Total Quantity value
+    const [inputUnit, setInputUnit] = useState('ml'); // 'ml' or 'gr'
     const [bottleSize, setBottleSize] = useState('30'); // Default bottle size 30ml
 
     const [loading, setLoading] = useState(false);
@@ -60,8 +62,35 @@ function NewProduction({ onUpdate }) {
         if (!r) return null;
 
         const baseOutput = r.output_quantity || 100;
-        const totalBatch = quantity ? parseFloat(quantity) : 0;
-        const ratio = totalBatch / baseOutput;
+        let totalBatchVolumeMl = 0;
+
+        if (quantity) {
+            const val = parseFloat(quantity);
+            if (inputUnit === 'ml') {
+                totalBatchVolumeMl = val;
+            } else {
+                // Converting Gram to ML for the whole batch
+                // We need to know the ratio to calculate merged density
+                // For simplicity, we first calculate assuming ratio 1:1, or use the recipe's ratio
+                // But a better way: totalBatchVolumeMl = Weight / MergedDensity
+                // However, the easiest way is to let the loop handle it by scaling the recipe
+
+                // Let's calculate the 'density' of the base recipe
+                const baseIngredients = r.recipe_ingredients.map(ing => {
+                    const mat = materials.find(m => m.id === ing.material_id);
+                    const isAlcohol = (mat?.category === 'Pelarut' || (mat?.name || '').toLowerCase().includes('ethanol') || (mat?.name || '').toLowerCase().includes('alkohol'));
+                    const density = isAlcohol ? ETHANOL_DENSITY : BIBIT_DENSITY;
+                    return { qty: ing.quantity, density };
+                });
+                const baseWeight = baseIngredients.reduce((sum, i) => sum + (i.qty * i.density), 0);
+                const baseVol = baseIngredients.reduce((sum, i) => sum + i.qty, 0);
+                const mergedDensity = baseWeight / baseVol;
+
+                totalBatchVolumeMl = val / mergedDensity;
+            }
+        }
+
+        const ratio = totalBatchVolumeMl / baseOutput;
 
         // 1. Map Ingredients to simplified objects
         const ingredients = r.recipe_ingredients.map(ing => {
@@ -190,7 +219,19 @@ function NewProduction({ onUpdate }) {
     const isWizard = currentRecipe?.method === 'wizard';
 
     // Output Calculation
-    const totalBottles = (quantity && bottleSize) ? Math.floor(parseFloat(quantity) / parseFloat(bottleSize)) : 0;
+    const calcVol = calculationData?.rawIngredients.reduce((sum, i) => sum + i.reqQty, 0) || 0; // This will vary if density is applied
+    // Actually totalBottles should use the volume ml
+    // If input was 2964gr and output is ~3400ml, totalBottles should be 3400 / 30
+    const currentTotalVolumeMl = calculationData ? calculationData.rawIngredients.reduce((sum, i) => {
+        // Find if this was converted
+        if (i.originalMl) return sum + i.originalMl;
+        // If not converted (already in ml), use reqQty
+        if (i.unit === 'ml' || i.unit === 'liter') return sum + (i.unit === 'liter' ? i.reqQty * 1000 : i.reqQty);
+        // If it's gr/kg but not identified as pelarut, it was treated as density 1.0 (bibit)
+        return sum + (i.unit === 'kg' ? i.reqQty * 1000 : i.reqQty) / BIBIT_DENSITY;
+    }, 0) : 0;
+
+    const totalBottles = (currentTotalVolumeMl && bottleSize) ? Math.floor(currentTotalVolumeMl / parseFloat(bottleSize)) : 0;
     const costPerBottle = totalBottles > 0 && calculationData ? calculationData.totalCost / totalBottles : 0;
 
     const handleProduce = async () => {
@@ -319,15 +360,30 @@ function NewProduction({ onUpdate }) {
 
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
-                                <Label className="text-slate-300">Total Batch (ml)</Label>
-                                <Input
-                                    type="number"
-                                    className="bg-slate-800 border-slate-600 h-11 text-white"
-                                    placeholder="Contoh: 1000"
-                                    value={quantity}
-                                    onChange={e => setQuantity(e.target.value)}
-                                    disabled={!selectedRecipe}
-                                />
+                                <Label className="text-slate-300 flex justify-between">
+                                    Total Batch
+                                    <div className="flex bg-slate-900 rounded p-0.5 border border-slate-700">
+                                        <button
+                                            className={`px-2 py-0.5 rounded text-[10px] transition-all ${inputUnit === 'ml' ? 'bg-indigo-600 text-white' : 'text-slate-500'}`}
+                                            onClick={() => setInputUnit('ml')}
+                                        >ML</button>
+                                        <button
+                                            className={`px-2 py-0.5 rounded text-[10px] transition-all ${inputUnit === 'gr' ? 'bg-indigo-600 text-white' : 'text-slate-500'}`}
+                                            onClick={() => setInputUnit('gr')}
+                                        >GR</button>
+                                    </div>
+                                </Label>
+                                <div className="relative">
+                                    <Input
+                                        type="number"
+                                        className="bg-slate-800 border-slate-600 h-11 text-white pr-10"
+                                        placeholder={`Contoh: ${inputUnit === 'ml' ? '1000' : '850'}`}
+                                        value={quantity}
+                                        onChange={e => setQuantity(e.target.value)}
+                                        disabled={!selectedRecipe}
+                                    />
+                                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-500 uppercase">{inputUnit}</span>
+                                </div>
                             </div>
                             <div className="space-y-2">
                                 <Label className="text-slate-300">Ukuran Botol (ml)</Label>
