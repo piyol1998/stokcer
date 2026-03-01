@@ -65,7 +65,9 @@ function NewProduction({ onUpdate }) {
         let totalBatchVolumeMl = 0;
         let totalBatchWeightGr = 0;
 
-        if (quantity) {
+        if (!r.recipe_ingredients) return null;
+
+        if (quantity && !isNaN(parseFloat(quantity))) {
             const val = parseFloat(quantity);
             if (inputUnit === 'ml') {
                 totalBatchVolumeMl = val;
@@ -73,7 +75,7 @@ function NewProduction({ onUpdate }) {
                     const mat = materials.find(m => m.id === ing.material_id);
                     const isAlcohol = (mat?.category === 'Pelarut' || (mat?.name || '').toLowerCase().includes('ethanol') || (mat?.name || '').toLowerCase().includes('alkohol'));
                     const density = isAlcohol ? ETHANOL_DENSITY : BIBIT_DENSITY;
-                    return { qty: ing.quantity, density };
+                    return { qty: parseFloat(ing.quantity) || 0, density };
                 });
                 const baseWeight = baseIngredients.reduce((sum, i) => sum + (i.qty * i.density), 0);
                 const baseVol = baseIngredients.reduce((sum, i) => sum + i.qty, 0);
@@ -90,7 +92,7 @@ function NewProduction({ onUpdate }) {
                     const mat = materials.find(m => m.id === ing.material_id);
                     const isAlcohol = (mat?.category === 'Pelarut' || (mat?.name || '').toLowerCase().includes('ethanol') || (mat?.name || '').toLowerCase().includes('alkohol'));
                     const density = isAlcohol ? ETHANOL_DENSITY : BIBIT_DENSITY;
-                    return { qty: ing.quantity, density };
+                    return { qty: parseFloat(ing.quantity) || 0, density };
                 });
                 const baseWeight = baseIngredients.reduce((sum, i) => sum + (i.qty * i.density), 0);
                 const baseVol = baseIngredients.reduce((sum, i) => sum + i.qty, 0);
@@ -107,7 +109,7 @@ function NewProduction({ onUpdate }) {
 
         const ingredients = r.recipe_ingredients.map(ing => {
             const mat = materials.find(m => m.id === ing.material_id);
-            const reqQty = ratio * ing.quantity;
+            const reqQty = ratio * (parseFloat(ing.quantity) || 0);
 
             if (!mat && ing.ingredient_recipe_id) {
                 const subRecipe = recipes.find(sr => sr.id === ing.ingredient_recipe_id);
@@ -484,7 +486,13 @@ function NewProduction({ onUpdate }) {
                             <FlaskConical className="w-10 h-10 mx-auto mb-3 opacity-20" />
                             <p>Pilih resep dan masukkan jumlah untuk melihat breakdown.</p>
                         </div>
-                    ) : calculationData && (
+                    ) : !calculationData ? (
+                        <div className="flex-1 flex flex-col items-center justify-center text-center text-amber-500 py-12 border-2 border-dashed border-amber-700/30 rounded-lg bg-amber-500/5">
+                            <HelpCircle className="w-10 h-10 mx-auto mb-3 opacity-40" />
+                            <p className="font-medium">Resep tidak memiliki komposisi bahan baku.</p>
+                            <p className="text-xs opacity-60 mt-2">Silakan periksa kembali resep di menu "Resep".</p>
+                        </div>
+                    ) : (
                         <div className="space-y-8 overflow-y-auto pr-2 custom-scrollbar flex-1">
 
                             {/* Top Section: Main Category Percentages */}
