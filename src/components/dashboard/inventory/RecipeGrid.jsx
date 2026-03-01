@@ -794,7 +794,7 @@ function RecipeGrid({ onUpdate }) {
                                             <div className="flex items-center gap-2">
                                                 <Input
                                                     type="number"
-                                                    className="bg-slate-900 border-slate-700 text-center font-black text-lg h-10"
+                                                    className="bg-slate-900 border-slate-700 text-center font-black text-lg h-10 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                                     value={sec.percent}
                                                     onChange={e => handleSectionChange(sec.id, 'percent', e.target.value)}
                                                 />
@@ -841,9 +841,16 @@ function RecipeGrid({ onUpdate }) {
                                                                 <option value="" className="bg-slate-900">Pilih...</option>
                                                                 {rawMaterials.filter(m => !m.deleted_at).map(m => <option key={m.id} value={m.id} className="bg-slate-900">{m.name}</option>)}
                                                             </select>
-                                                            <div className="w-24 relative">
-                                                                <Input type="number" placeholder="%" className="h-8 bg-slate-800 border-none text-xs pr-6 text-center font-bold text-slate-100" value={mat.percent_share} onChange={e => handleBibitSectionMaterialChange(sec.id, idx, 'percent_share', e.target.value)} />
-                                                                <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-500 font-bold">%</span>
+                                                            <div className="w-20 shrink-0 relative">
+                                                                <Input
+                                                                    type="number"
+                                                                    placeholder="%"
+                                                                    className="h-8 bg-slate-800 border-none text-xs px-2 pr-6 text-center font-bold text-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none shadow-inner"
+                                                                    style={{ textShadow: '0 0 1px white' }}
+                                                                    value={mat.percent_share}
+                                                                    onChange={e => handleBibitSectionMaterialChange(sec.id, idx, 'percent_share', e.target.value)}
+                                                                />
+                                                                <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-black">%</span>
                                                             </div>
                                                             <button type="button" onClick={() => handleRemoveBibitSectionMaterial(sec.id, idx)} className="text-slate-500 hover:text-red-400 transition-colors p-1"><Trash2 className="w-3.5 h-3.5" /></button>
                                                         </div>
