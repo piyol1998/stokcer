@@ -10,6 +10,8 @@ import { useAuth } from '@/contexts/SupabaseAuthContext';
 import { useToast } from '@/components/ui/use-toast';
 import { logNotification } from '@/lib/notificationUtils';
 import { getRecipeColor } from '@/lib/utils';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { ChevronDown } from 'lucide-react';
 
 // --- Customized View for Recipe A (Wizard Type) ---
 const RecipeAWizardView = ({ recipe, allMaterials, colorTheme }) => {
@@ -184,6 +186,20 @@ function RecipeGrid({ onUpdate }) {
         additionalMaterials: []
     });
 
+    const availableCategories = React.useMemo(() => {
+        const cats = [...new Set(rawMaterials.map(m => m.category).filter(Boolean))];
+        // Ensure standard ones are prioritized or present
+        const priority = ['BIBIT', 'ALKOHOL', 'FIXATIVE', 'BOTOL', 'BOX'];
+        return cats.sort((a, b) => {
+            const indexA = priority.indexOf(a.toUpperCase());
+            const indexB = priority.indexOf(b.toUpperCase());
+            if (indexA !== -1 && indexB !== -1) return indexA - indexB;
+            if (indexA !== -1) return -1;
+            if (indexB !== -1) return 1;
+            return a.localeCompare(b);
+        });
+    }, [rawMaterials]);
+
     useEffect(() => {
         if (user) fetchData();
     }, [user]);
@@ -298,10 +314,18 @@ function RecipeGrid({ onUpdate }) {
         setManualIngredients(newIngredients);
     };
 
-    const handleAddSection = () => {
+    const handleAddSection = (catName = 'Kategori Baru') => {
+        const isMultiType = catName.toLowerCase().includes('bibit') || catName.toLowerCase().includes('campuran'); // Added 'campuran' as a potential multi-type category
         setWizardData(prev => ({
             ...prev,
-            sections: [...prev.sections, { id: `sec-${Date.now()}`, name: 'Kategori Baru', percent: 0, type: 'single', materialId: '', materials: [] }]
+            sections: [...prev.sections, {
+                id: `sec-${Date.now()}`,
+                name: catName,
+                percent: 0,
+                type: isMultiType ? 'multi' : 'single',
+                materialId: '',
+                materials: isMultiType ? [{ id: '', percent_share: 100 }] : []
+            }]
         }));
     };
 
@@ -321,6 +345,16 @@ function RecipeGrid({ onUpdate }) {
                     // Ensure materials array exists if switching to multi
                     if (field === 'type' && value === 'multi' && (!updated.materials || !Array.isArray(updated.materials))) {
                         updated.materials = [];
+                    }
+                    // If changing name, also update type if it's a 'bibit' category
+                    if (field === 'name') {
+                        const isMultiType = value.toLowerCase().includes('bibit') || value.toLowerCase().includes('campuran');
+                        updated.type = isMultiType ? 'multi' : 'single';
+                        if (isMultiType && (!updated.materials || !Array.isArray(updated.materials))) {
+                            updated.materials = [{ id: '', percent_share: 100 }];
+                        } else if (!isMultiType) {
+                            updated.materials = [];
+                        }
                     }
                     return updated;
                 }
@@ -773,20 +807,42 @@ function RecipeGrid({ onUpdate }) {
                                             Total: {wizardData.sections.reduce((sum, s) => sum + (parseFloat(s.percent) || 0), 0)}%
                                         </span>
                                     </div>
-                                    <Button type="button" size="sm" onClick={handleAddSection} className="h-8 bg-indigo-600 hover:bg-indigo-700 text-xs shadow-lg shadow-indigo-500/20">
-                                        <Plus className="w-3.5 h-3.5 mr-1" /> Tambah Kolom
-                                    </Button>
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                            <Button type="button" size="sm" className="h-8 bg-indigo-600 hover:bg-indigo-700 text-xs shadow-lg shadow-indigo-500/20">
+                                                <Plus className="w-3.5 h-3.5 mr-1" /> Tambah Kolom <ChevronDown className="w-3 h-3 ml-1" />
+                                            </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent className="bg-slate-900 border-slate-700 text-slate-100 max-h-[300px] overflow-y-auto">
+                                            {availableCategories.length > 0 ? (
+                                                availableCategories.map(cat => (
+                                                    <DropdownMenuItem key={cat} onClick={() => handleAddSection(cat)} className="hover:bg-slate-800 cursor-pointer focus:bg-indigo-600 focus:text-white">
+                                                        {cat}
+                                                    </DropdownMenuItem>
+                                                ))
+                                            ) : (
+                                                <DropdownMenuItem onClick={() => handleAddSection()} className="text-slate-500 italic">
+                                                    Tambah Kategori Baru
+                                                </DropdownMenuItem>
+                                            )}
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
                                 </div>
 
                                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                                     {wizardData.sections.map((sec) => (
                                         <div key={sec.id} className="bg-slate-800/40 p-4 rounded-xl border border-slate-700/50 relative group shadow-sm hover:border-slate-600 transition-all">
                                             <div className="flex justify-between items-start mb-3">
-                                                <Input
-                                                    className="bg-transparent border-none p-0 h-auto text-sm font-bold text-indigo-300 focus-visible:ring-0 focus-visible:ring-offset-0 disabled:opacity-100"
+                                                <select
+                                                    className="bg-transparent border-none p-0 h-auto text-sm font-bold text-indigo-300 focus:ring-0 cursor-pointer"
                                                     value={sec.name}
                                                     onChange={e => handleSectionChange(sec.id, 'name', e.target.value)}
-                                                />
+                                                >
+                                                    <option value={sec.name} className="bg-slate-900">{sec.name}</option>
+                                                    {availableCategories.filter(c => c !== sec.name).map(c => (
+                                                        <option key={c} value={c} className="bg-slate-900">{c}</option>
+                                                    ))}
+                                                </select>
                                                 <button onClick={() => handleRemoveSection(sec.id)} className="p-1.5 rounded-lg hover:bg-red-500/20 text-slate-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all">
                                                     <Trash2 className="w-3.5 h-3.5" />
                                                 </button>
@@ -839,7 +895,10 @@ function RecipeGrid({ onUpdate }) {
                                                         <div key={idx} className="flex gap-2 items-center bg-slate-900/50 p-2 rounded-lg border border-slate-700/50 shadow-inner">
                                                             <select className="flex-1 h-8 rounded border-none bg-transparent text-xs text-slate-200" value={mat.id} onChange={e => handleBibitSectionMaterialChange(sec.id, idx, 'id', e.target.value)}>
                                                                 <option value="" className="bg-slate-900">Pilih...</option>
-                                                                {rawMaterials.filter(m => !m.deleted_at).map(m => <option key={m.id} value={m.id} className="bg-slate-900">{m.name}</option>)}
+                                                                {rawMaterials
+                                                                    .filter(m => !m.deleted_at && m.category?.toUpperCase() === sec.name?.toUpperCase())
+                                                                    .map(m => <option key={m.id} value={m.id} className="bg-slate-900">{m.name}</option>)
+                                                                }
                                                             </select>
                                                             <div className="w-20 shrink-0 relative">
                                                                 <Input
@@ -862,7 +921,10 @@ function RecipeGrid({ onUpdate }) {
                                                     <div className="flex-1">
                                                         <select className="w-full h-10 rounded-lg border border-slate-700 bg-slate-900 text-sm px-3 text-slate-100 focus:border-indigo-500 outline-none transition-all" value={sec.materialId} onChange={e => handleSectionChange(sec.id, 'materialId', e.target.value)}>
                                                             <option value="">Pilih Bahan Utama...</option>
-                                                            {rawMaterials.filter(m => !m.deleted_at).map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                                                            {rawMaterials
+                                                                .filter(m => !m.deleted_at && m.category?.toUpperCase() === sec.name?.toUpperCase())
+                                                                .map(m => <option key={m.id} value={m.id}>{m.name}</option>)
+                                                            }
                                                         </select>
                                                     </div>
                                                     <div className="hidden sm:flex flex-col text-[10px] text-slate-500 space-y-0.5">

@@ -5,9 +5,13 @@ export function cn(...inputs) {
   return twMerge(clsx(inputs))
 }
 
+export function formatCurrency(val) {
+  return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(val || 0);
+}
+
 export function getColorForString(str) {
   if (!str) return 'bg-slate-500/20 text-slate-400 border-slate-500/30';
-  
+
   const colors = [
     'bg-red-500/20 text-red-400 border-red-500/30',
     'bg-orange-500/20 text-orange-400 border-orange-500/30',
@@ -32,7 +36,7 @@ export function getColorForString(str) {
   for (let i = 0; i < str.length; i++) {
     hash = str.charCodeAt(i) + ((hash << 5) - hash);
   }
-  
+
   const index = Math.abs(hash) % colors.length;
   return colors[index];
 }
@@ -69,7 +73,7 @@ export function getRecipeColor(str) {
   for (let i = 0; i < str.length; i++) {
     hash = str.charCodeAt(i) + ((hash << 5) - hash);
   }
-  
+
   const index = Math.abs(hash) % themes.length;
   return themes[index];
 }
