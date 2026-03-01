@@ -10,6 +10,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { logNotification } from '@/lib/notificationUtils';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useNavigate } from 'react-router-dom';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 function MaterialsList({ onUpdate }) {
     const { user, ownerId } = useAuth();
