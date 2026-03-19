@@ -6,7 +6,7 @@ import { useAuth } from '@/contexts/SupabaseAuthContext';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
 import { Input } from '@/components/ui/input';
-import { getColorForString } from '@/lib/utils';
+import { getColorForString, formatCurrency } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 function ProductionHistory() {
@@ -232,10 +232,10 @@ function ProductionHistory() {
                                         <div className="flex flex-col">
                                             <div className="flex items-center gap-2 text-emerald-400">
                                                 <Coins className="w-4 h-4" />
-                                                <span className="font-bold">Rp {estimatedCost.toLocaleString()}</span>
+                                                <span className="font-bold">{formatCurrency(estimatedCost)}</span>
                                             </div>
                                             <div className="text-[10px] text-emerald-500/70 mt-0.5 flex items-center gap-1">
-                                                <span>@ Rp {costPerBottle.toLocaleString('id-ID', { maximumFractionDigits: 0 })} / botol</span>
+                                                <span>@ {formatCurrency(costPerBottle)} / botol</span>
                                                 <TooltipProvider>
                                                     <Tooltip>
                                                         <TooltipTrigger>
@@ -314,7 +314,7 @@ function ProductionHistory() {
                                                                 {percentage.toFixed(1)}%
                                                             </div>
                                                             <div className="col-span-3 text-right text-emerald-500 font-mono text-xs">
-                                                                Rp {rowCost.toLocaleString()}
+                                                                {formatCurrency(rowCost)}
                                                             </div>
                                                         </div>
                                                     );
@@ -322,7 +322,7 @@ function ProductionHistory() {
 
                                                 <div className="grid grid-cols-12 gap-2 text-sm pt-3 mt-2 border-t border-slate-700 px-3">
                                                     <div className="col-span-9 text-right font-bold text-slate-400">TOTAL BATCH COST</div>
-                                                    <div className="col-span-3 text-right font-bold text-emerald-400">Rp {estimatedCost.toLocaleString()}</div>
+                                                    <div className="col-span-3 text-right font-bold text-emerald-400">{formatCurrency(estimatedCost)}</div>
                                                 </div>
                                             </div>
                                         </div>
