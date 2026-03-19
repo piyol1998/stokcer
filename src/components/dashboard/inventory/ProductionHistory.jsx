@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/customSupabaseClient';
-import { History, ChevronDown, ChevronUp, Trash2, Coins, Calculator, Layers, Beaker, Wine, HelpCircle } from 'lucide-react';
+import { History, ChevronDown, ChevronUp, Trash2, Coins, Calculator, Layers, Beaker, Wine, HelpCircle, Search } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/contexts/SupabaseAuthContext';
 import { Button } from '@/components/ui/button';
@@ -19,6 +19,9 @@ function ProductionHistory() {
 
     // State for manual bottle estimation per row
     const [bottleEstimators, setBottleEstimators] = useState({});
+
+    // State for search filter
+    const [searchTerm, setSearchTerm] = useState("");
 
     useEffect(() => {
         fetchData();
@@ -136,15 +139,35 @@ function ProductionHistory() {
 
     if (loading) return <div className="p-8 text-center text-slate-500">Memuat riwayat...</div>;
 
+    const filteredHistory = history.filter(item => {
+        const term = searchTerm.toLowerCase();
+        const batchId = `BATCH${item.id.replace(/-/g, '').substring(0, 8)}`.toLowerCase();
+        const recipeName = (item.recipe_name || "").toLowerCase();
+        return batchId.includes(term) || recipeName.includes(term);
+    });
+
     return (
         <div className="space-y-6">
-            <div className="flex items-center gap-3 mb-6">
-                <History className="w-6 h-6 text-indigo-400" />
-                <h2 className="text-xl font-bold text-white">Riwayat Produksi</h2>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                <div className="flex items-center gap-3">
+                    <History className="w-6 h-6 text-indigo-400" />
+                    <h2 className="text-xl font-bold text-white">Riwayat Produksi</h2>
+                </div>
+
+                <div className="relative w-full sm:w-64">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                    <Input
+                        type="text"
+                        placeholder="Cari ID Batch atau Resep..."
+                        className="pl-9 bg-slate-800/50 border-slate-700/50 text-slate-200 focus:border-indigo-500 w-full"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                </div>
             </div>
 
             <div className="space-y-4">
-                {history.map((item) => {
+                {filteredHistory.map((item) => {
                     const batchId = `BATCH${item.id.replace(/-/g, '').substring(0, 8).toUpperCase()}`;
                     const isExpanded = expandedId === item.id;
                     const badgeColor = getColorForString(item.recipe_name);
@@ -336,6 +359,12 @@ function ProductionHistory() {
                     <div className="text-center py-12 text-slate-500 border border-dashed border-slate-700 rounded-lg">
                         <History className="w-10 h-10 mx-auto mb-3 opacity-20" />
                         <p>Belum ada riwayat produksi.</p>
+                    </div>
+                )}
+                {history.length > 0 && filteredHistory.length === 0 && (
+                    <div className="text-center py-12 text-slate-500 border border-dashed border-slate-700 rounded-lg">
+                        <Search className="w-10 h-10 mx-auto mb-3 opacity-20" />
+                        <p>Tidak ada batch yang cocok dengan pencarian.</p>
                     </div>
                 )}
             </div>
