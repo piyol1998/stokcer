@@ -882,7 +882,12 @@ function RecipeGrid({ onUpdate }) {
                                             <div className="flex justify-between items-center mb-4">
                                                 <div className="flex items-center gap-2">
                                                     <div className={`w-2 h-2 rounded-full ${sec.type === 'multi' ? 'bg-indigo-400' : 'bg-emerald-400'}`}></div>
-                                                    <Label className="text-white font-bold">{sec.name} ({sec.percent}%)</Label>
+                                                    <Label className="text-white font-bold uppercase">{sec.name} ({sec.percent}%)</Label>
+                                                    {sec.type === 'multi' && (
+                                                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${Math.abs((sec.materials || []).reduce((sum, m) => sum + (parseFloat(m.percent_share) || 0), 0) - 100) < 0.1 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
+                                                            Total: {(sec.materials || []).reduce((sum, m) => sum + (parseFloat(m.percent_share) || 0), 0).toFixed(1).replace(/\.0$/, '')}%
+                                                        </span>
+                                                    )}
                                                 </div>
                                                 {sec.type === 'multi' && (
                                                     <Button type="button" size="sm" variant="outline" onClick={() => handleAddBibitSectionMaterial(sec.id)} className="h-7 text-[10px] border-indigo-500/30 text-indigo-400 hover:bg-indigo-500/10">
