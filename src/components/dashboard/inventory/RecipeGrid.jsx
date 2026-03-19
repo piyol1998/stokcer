@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/customSupabaseClient';
-import { BookOpen, Plus, Trash2, Edit2, FlaskConical, Component, Leaf, Info, Calculator, Wand2, RefreshCw, Beaker, FileSpreadsheet } from 'lucide-react';
+import { BookOpen, Plus, Trash2, Edit2, FlaskConical, Component, Leaf, Info, Calculator, Wand2, RefreshCw, Beaker, FileSpreadsheet, ChevronDown, Search, Check, ChevronsUpDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -11,7 +11,6 @@ import { useToast } from '@/components/ui/use-toast';
 import { logNotification } from '@/lib/notificationUtils';
 import { getRecipeColor } from '@/lib/utils';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { ChevronDown } from 'lucide-react';
 
 // --- Customized View for Recipe A (Wizard Type) ---
 const RecipeAWizardView = ({ recipe, allMaterials, colorTheme }) => {
@@ -152,6 +151,80 @@ const RecipeCompositionView = ({ ingredients, allRecipes, allMaterials, totalQty
                     </div>
                 );
             })}
+        </div>
+    );
+};
+
+// --- Custom Searchable Select Component ---
+const SearchableSelect = ({ options, value, onChange, placeholder = "Pilih...", className = "" }) => {
+    const [open, setOpen] = useState(false);
+    const [search, setSearch] = useState("");
+    const wrapperRef = React.useRef(null);
+
+    useEffect(() => {
+        function handleClickOutside(event) {
+            if (wrapperRef.current && !wrapperRef.current.contains(event.target)) {
+                setOpen(false);
+            }
+        }
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
+
+    const selectedOption = options.find(opt => String(opt.value) === String(value));
+    const filteredOptions = options.filter(opt => opt.label.toLowerCase().includes(search.toLowerCase()));
+
+    return (
+        <div className={`relative flex-1 ${className}`} ref={wrapperRef}>
+            <button
+                type="button"
+                className="w-full flex items-center justify-between h-8 px-2 rounded bg-slate-900 hover:bg-slate-800 border border-slate-700 text-left shadow-sm group transition-all"
+                onClick={() => { setOpen(!open); setSearch(''); }}
+            >
+                <div className="flex items-center flex-1 min-w-0 pr-2">
+                    <Search className="w-3.5 h-3.5 text-indigo-400/70 mr-2 shrink-0 group-hover:text-indigo-400 transition-colors" />
+                    <span className={`truncate text-xs ${selectedOption ? 'text-slate-200' : 'text-slate-500'}`}>
+                        {selectedOption ? selectedOption.label : placeholder}
+                    </span>
+                </div>
+                <ChevronsUpDown className="w-3 h-3 text-slate-500 opacity-50 shrink-0" />
+            </button>
+
+            {open && (
+                <div className="absolute z-[9999] top-full left-0 w-[240px] mt-1 bg-slate-900 border border-slate-700 rounded-md shadow-xl overflow-hidden flex flex-col">
+                    <div className="flex items-center px-2 border-b border-slate-800 bg-slate-950">
+                        <Search className="w-3.5 h-3.5 text-indigo-400 mr-2 shrink-0" />
+                        <input
+                            autoFocus
+                            type="text"
+                            placeholder="Ketik untuk mencari bahan..."
+                            className="flex-1 bg-transparent border-none h-8 text-xs text-slate-200 outline-none focus:ring-0 placeholder-slate-500"
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                        />
+                    </div>
+                    <div className="max-h-48 overflow-y-auto py-1">
+                        {filteredOptions.length > 0 ? (
+                            filteredOptions.map((opt) => (
+                                <button
+                                    key={opt.value}
+                                    type="button"
+                                    className={`w-full text-left px-3 py-2 text-xs flex items-center justify-between hover:bg-indigo-600 hover:text-white transition-colors ${String(value) === String(opt.value) ? 'bg-indigo-500/20 text-indigo-300' : 'text-slate-300'}`}
+                                    onClick={() => {
+                                        onChange(opt.value);
+                                        setOpen(false);
+                                    }}
+                                >
+                                    <span className="truncate">{opt.label}</span>
+                                    {String(value) === String(opt.value) && <Check className="w-3 h-3 shrink-0 ml-2" />}
+                                </button>
+                            ))
+                        ) : (
+                            <div className="px-3 py-3 text-xs text-slate-500 text-center">Tidak ditemukan.</div>
+                        )}
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
@@ -900,13 +973,15 @@ function RecipeGrid({ onUpdate }) {
                                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                                     {(sec.materials || []).map((mat, idx) => (
                                                         <div key={idx} className="flex gap-2 items-center bg-slate-900/50 p-2 rounded-lg border border-slate-700/50 shadow-inner">
-                                                            <select className="flex-1 h-8 rounded border-none bg-transparent text-xs text-slate-200" value={mat.id} onChange={e => handleBibitSectionMaterialChange(sec.id, idx, 'id', e.target.value)}>
-                                                                <option value="" className="bg-slate-900">Pilih...</option>
-                                                                {rawMaterials
+                                                            <SearchableSelect
+                                                                options={rawMaterials
                                                                     .filter(m => !m.deleted_at && m.category?.toUpperCase() === sec.name?.toUpperCase())
-                                                                    .map(m => <option key={m.id} value={m.id} className="bg-slate-900">{m.name}</option>)
+                                                                    .map(m => ({ value: m.id, label: m.name }))
                                                                 }
-                                                            </select>
+                                                                value={mat.id}
+                                                                onChange={val => handleBibitSectionMaterialChange(sec.id, idx, 'id', val)}
+                                                                placeholder="Ketik untuk mencari..."
+                                                            />
                                                             <div className="w-20 shrink-0 relative">
                                                                 <Input
                                                                     type="number"
@@ -926,13 +1001,16 @@ function RecipeGrid({ onUpdate }) {
                                             ) : (
                                                 <div className="flex gap-4 items-center">
                                                     <div className="flex-1">
-                                                        <select className="w-full h-10 rounded-lg border border-slate-700 bg-slate-900 text-sm px-3 text-slate-100 focus:border-indigo-500 outline-none transition-all" value={sec.materialId} onChange={e => handleSectionChange(sec.id, 'materialId', e.target.value)}>
-                                                            <option value="">Pilih Bahan Utama...</option>
-                                                            {rawMaterials
+                                                        <SearchableSelect
+                                                            options={rawMaterials
                                                                 .filter(m => !m.deleted_at && m.category?.toUpperCase() === sec.name?.toUpperCase())
-                                                                .map(m => <option key={m.id} value={m.id}>{m.name}</option>)
+                                                                .map(m => ({ value: m.id, label: m.name }))
                                                             }
-                                                        </select>
+                                                            value={sec.materialId}
+                                                            onChange={val => handleSectionChange(sec.id, 'materialId', val)}
+                                                            placeholder="Ketik untuk mencari bahan utama..."
+                                                            className="h-10 rounded-lg border border-slate-700 bg-slate-900 flex items-center px-1"
+                                                        />
                                                     </div>
                                                     <div className="hidden sm:flex flex-col text-[10px] text-slate-500 space-y-0.5">
                                                         <span>INFO: Kategori "{sec.name}" akan menggunakan {sec.percent}% dari total volume.</span>
