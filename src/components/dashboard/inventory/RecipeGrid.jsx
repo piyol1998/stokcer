@@ -259,6 +259,8 @@ function RecipeGrid({ onUpdate }) {
         additionalMaterials: []
     });
 
+    const [sectionSearchTerms, setSectionSearchTerms] = useState({});
+
     const availableCategories = React.useMemo(() => {
         // Collect all categories and normalize them to uppercase
         const normalizedCats = [...new Set(rawMaterials.map(m => (m.category || '').toUpperCase()).filter(Boolean))];
@@ -957,9 +959,21 @@ function RecipeGrid({ onUpdate }) {
                                                     <div className={`w-2 h-2 rounded-full ${sec.type === 'multi' ? 'bg-indigo-400' : 'bg-emerald-400'}`}></div>
                                                     <Label className="text-white font-bold uppercase">{sec.name} ({sec.percent}%)</Label>
                                                     {sec.type === 'multi' && (
-                                                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${Math.abs((sec.materials || []).reduce((sum, m) => sum + (parseFloat(m.percent_share) || 0), 0) - 100) < 0.1 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
-                                                            Total: {(sec.materials || []).reduce((sum, m) => sum + (parseFloat(m.percent_share) || 0), 0).toFixed(1).replace(/\.0$/, '')}%
-                                                        </span>
+                                                        <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+                                                            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${Math.abs((sec.materials || []).reduce((sum, m) => sum + (parseFloat(m.percent_share) || 0), 0) - 100) < 0.1 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
+                                                                Total: {(sec.materials || []).reduce((sum, m) => sum + (parseFloat(m.percent_share) || 0), 0).toFixed(1).replace(/\.0$/, '')}%
+                                                            </span>
+                                                            <div className="flex items-center bg-slate-900/50 border border-slate-700/50 rounded-md px-2 h-7 focus-within:border-indigo-500/50 transition-colors">
+                                                                <Search className="w-3 h-3 text-slate-500 mr-1.5" />
+                                                                <input
+                                                                    type="text"
+                                                                    placeholder="Cari bahan diracikan..."
+                                                                    className="bg-transparent border-none text-[10px] text-slate-200 w-32 focus:ring-0 p-0 placeholder-slate-600 outline-none"
+                                                                    value={sectionSearchTerms[sec.id] || ''}
+                                                                    onChange={e => setSectionSearchTerms(prev => ({ ...prev, [sec.id]: e.target.value }))}
+                                                                />
+                                                            </div>
+                                                        </div>
                                                     )}
                                                 </div>
                                                 {sec.type === 'multi' && (
@@ -971,31 +985,43 @@ function RecipeGrid({ onUpdate }) {
 
                                             {sec.type === 'multi' ? (
                                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                                    {(sec.materials || []).map((mat, idx) => (
-                                                        <div key={idx} className="flex gap-2 items-center bg-slate-900/50 p-2 rounded-lg border border-slate-700/50 shadow-inner">
-                                                            <SearchableSelect
-                                                                options={rawMaterials
-                                                                    .filter(m => !m.deleted_at && m.category?.toUpperCase() === sec.name?.toUpperCase())
-                                                                    .map(m => ({ value: m.id, label: m.name }))
-                                                                }
-                                                                value={mat.id}
-                                                                onChange={val => handleBibitSectionMaterialChange(sec.id, idx, 'id', val)}
-                                                                placeholder="Ketik untuk mencari..."
-                                                            />
-                                                            <div className="w-20 shrink-0 relative">
-                                                                <Input
-                                                                    type="number"
-                                                                    placeholder="%"
-                                                                    className="h-8 bg-slate-800 border-none text-xs px-2 pr-6 text-center font-bold text-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none shadow-inner"
-                                                                    style={{ textShadow: '0 0 1px white' }}
-                                                                    value={mat.percent_share}
-                                                                    onChange={e => handleBibitSectionMaterialChange(sec.id, idx, 'percent_share', e.target.value)}
+                                                    {(sec.materials || []).map((mat, idx) => {
+                                                        const searchVal = (sectionSearchTerms[sec.id] || '').toLowerCase();
+                                                        const materialRef = rawMaterials.find(m => m.id === mat.id);
+                                                        const mName = materialRef ? materialRef.name.toLowerCase() : '';
+
+                                                        // Ensure empty "Pilih" slots still show if we are searching (so users can still pick), 
+                                                        // or hide them if that's preferred. We'll show empty slots so they can still add new materials while searching.
+                                                        if (searchVal && mat.id && !mName.includes(searchVal)) {
+                                                            return null;
+                                                        }
+
+                                                        return (
+                                                            <div key={idx} className="flex gap-2 items-center bg-slate-900/50 p-2 rounded-lg border border-slate-700/50 shadow-inner">
+                                                                <SearchableSelect
+                                                                    options={rawMaterials
+                                                                        .filter(m => !m.deleted_at && m.category?.toUpperCase() === sec.name?.toUpperCase())
+                                                                        .map(m => ({ value: m.id, label: m.name }))
+                                                                    }
+                                                                    value={mat.id}
+                                                                    onChange={val => handleBibitSectionMaterialChange(sec.id, idx, 'id', val)}
+                                                                    placeholder="Ketik untuk mencari..."
                                                                 />
-                                                                <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-black">%</span>
+                                                                <div className="w-20 shrink-0 relative">
+                                                                    <Input
+                                                                        type="number"
+                                                                        placeholder="%"
+                                                                        className="h-8 bg-slate-800 border-none text-xs px-2 pr-6 text-center font-bold text-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none shadow-inner"
+                                                                        style={{ textShadow: '0 0 1px white' }}
+                                                                        value={mat.percent_share}
+                                                                        onChange={e => handleBibitSectionMaterialChange(sec.id, idx, 'percent_share', e.target.value)}
+                                                                    />
+                                                                    <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-black">%</span>
+                                                                </div>
+                                                                <button type="button" onClick={() => handleRemoveBibitSectionMaterial(sec.id, idx)} className="text-slate-500 hover:text-red-400 transition-colors p-1"><Trash2 className="w-3.5 h-3.5" /></button>
                                                             </div>
-                                                            <button type="button" onClick={() => handleRemoveBibitSectionMaterial(sec.id, idx)} className="text-slate-500 hover:text-red-400 transition-colors p-1"><Trash2 className="w-3.5 h-3.5" /></button>
-                                                        </div>
-                                                    ))}
+                                                        );
+                                                    })}
                                                     {(!sec.materials || sec.materials.length === 0) && <p className="col-span-full text-xs text-slate-500 italic">Belum ada bahan terpilih.</p>}
                                                 </div>
                                             ) : (
