@@ -90,7 +90,10 @@ const ProductionBatchModal = ({ isOpen, onClose, ownerId }) => {
         try {
             const { data, error } = await supabase
                 .from('production_history')
-                .select('*')
+                .select(`
+                    *,
+                    recipe:recipes(image_url)
+                `)
                 .eq('user_id', ownerId)
                 .order('date', { ascending: false });
 
@@ -493,8 +496,20 @@ const ProductionBatchModal = ({ isOpen, onClose, ownerId }) => {
                                         >
                                             <div className="flex items-center justify-between">
                                                 <div className="flex items-start gap-4">
-                                                    <div className={`w-12 h-12 rounded-lg flex items-center justify-center bg-opacity-10 ${getColorForString(batch.recipe_name)} border border-white/5`}>
-                                                        <Beaker className="w-6 h-6 opacity-70" />
+                                                    <div className={`w-14 h-14 rounded-lg flex items-center justify-center overflow-hidden bg-opacity-10 ${getColorForString(batch.recipe_name)} border border-white/5 flex-shrink-0`}>
+                                                        {batch.recipe?.image_url ? (
+                                                            <img 
+                                                                src={batch.recipe.image_url} 
+                                                                alt={batch.recipe_name} 
+                                                                className="w-full h-full object-cover"
+                                                                onError={(e) => {
+                                                                    e.target.style.display = 'none';
+                                                                    e.target.parentElement.innerHTML = '<span class="beaker-fallback"></span>';
+                                                                }}
+                                                            />
+                                                        ) : (
+                                                            <Beaker className="w-6 h-6 opacity-70" />
+                                                        )}
                                                     </div>
                                                     <div>
                                                         <div className="flex items-center gap-2 mb-1">

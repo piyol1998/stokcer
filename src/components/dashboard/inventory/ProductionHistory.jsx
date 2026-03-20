@@ -33,7 +33,7 @@ function ProductionHistory() {
             const [histData, matData] = await Promise.all([
                 supabase
                     .from('production_history')
-                    .select('*')
+                    .select('*, recipe:recipes(image_url)')
                     .order('date', { ascending: false }),
                 supabase.from('raw_materials').select('*')
             ]);
@@ -202,7 +202,17 @@ function ProductionHistory() {
                                 {/* Header Row: ID, Name, Date */}
                                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4 border-b border-slate-700/50 pb-4">
                                     <div className="flex items-center gap-3">
-                                        <span className="text-lg font-bold text-slate-200 tracking-wider font-mono">{batchId}</span>
+                                        <div className={`w-10 h-10 rounded-lg overflow-hidden flex items-center justify-center bg-opacity-10 ${badgeColor} border border-white/5 flex-shrink-0`}>
+                                            {item.recipe?.image_url ? (
+                                                <img src={item.recipe.image_url} alt={item.recipe_name} className="w-full h-full object-cover" />
+                                            ) : (
+                                                <Beaker className="w-5 h-5 opacity-50" />
+                                            )}
+                                        </div>
+                                        <div className="flex flex-col">
+                                            <span className="text-lg font-bold text-slate-200 tracking-wider font-mono leading-none">{batchId}</span>
+                                            <span className="text-[10px] text-slate-500 mt-1 uppercase tracking-widest font-bold">Produksi</span>
+                                        </div>
                                         <span className={`px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wide border ${badgeColor}`}>
                                             {item.recipe_name}
                                         </span>
