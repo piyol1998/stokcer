@@ -408,7 +408,7 @@ function RecipeGrid({ onUpdate }) {
             });
 
             // Load existing photo
-            const photoUrl = recipe.metadata?.photo_url || recipe.photo_url || null;
+            const photoUrl = recipe.image_url || recipe.metadata?.photo_url || recipe.photo_url || null;
             if (photoUrl) {
                 setExistingPhotoUrl(photoUrl);
                 setPhotoPreview(photoUrl);
@@ -672,16 +672,15 @@ function RecipeGrid({ onUpdate }) {
                 photoUrl = null;
             }
 
-            // Add photo_url to metadata
-            metadata.photo_url = photoUrl;
-
+            // Add image_url to payload and metadata
             const recipePayload = {
                 user_id: user.id,
                 name: generalInfo.name,
                 description: generalInfo.description,
                 output_quantity: totalOutput,
                 method: methodType,
-                metadata: metadata
+                metadata: { ...metadata, photo_url: photoUrl },
+                image_url: photoUrl
             };
 
             let recipeId;
@@ -920,10 +919,10 @@ function RecipeGrid({ onUpdate }) {
                         return (
                             <div key={recipe.id} className={`bg-[#1e293b] rounded-xl border ${colorTheme.border} ${colorTheme.glow} shadow-lg overflow-hidden flex flex-col h-full hover:shadow-xl transition-all`}>
                                 {/* Recipe Photo */}
-                                {(recipe.metadata?.photo_url || recipe.photo_url) && (
+                                {(recipe.image_url || recipe.metadata?.photo_url || recipe.photo_url) && (
                                     <div className="relative w-full overflow-hidden bg-slate-900/80 flex items-center justify-center p-2">
                                         <img
-                                            src={recipe.metadata?.photo_url || recipe.photo_url}
+                                            src={recipe.image_url || recipe.metadata?.photo_url || recipe.photo_url}
                                             alt={recipe.name}
                                             className="w-full max-h-52 object-contain rounded-lg transition-transform duration-500 hover:scale-105"
                                             onError={(e) => { e.target.parentElement.style.display = 'none'; }}

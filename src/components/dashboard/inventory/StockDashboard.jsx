@@ -105,7 +105,7 @@ function StockDashboard() {
   const openPhotoDialog = (item) => {
     setPhotoTarget(item);
     setPhotoFile(null);
-    setPhotoPreview(item.photo_url || null);
+    setPhotoPreview(item.image_url || null);
     if (fileInputRef.current) fileInputRef.current.value = '';
     setIsPhotoDialogOpen(true);
   };
@@ -186,18 +186,18 @@ function StockDashboard() {
         photoUrl = null;
       }
 
-      // Save photo_url to the stocks table
+      // Save image_url to the stocks table
       const { error } = await supabase
         .from('stocks')
-        .update({ photo_url: photoUrl })
+        .update({ image_url: photoUrl })
         .eq('id', photoTarget.id);
 
       if (error) {
         // If column doesn't exist, show helpful error
-        if (error.code === '42703' || error.message?.includes('photo_url')) {
+        if (error.code === '42703' || error.message?.includes('image_url')) {
           toast({
             title: "Kolom Belum Ada",
-            description: "Tambahkan kolom 'photo_url' (tipe text) ke tabel 'stocks' di Supabase Dashboard.",
+            description: "Tambahkan kolom 'image_url' (tipe text) ke tabel 'stocks' di Supabase Dashboard.",
             variant: "destructive"
           });
           return;
@@ -248,12 +248,12 @@ function StockDashboard() {
               <div 
                 className="relative w-full bg-slate-900/80 flex items-center justify-center cursor-pointer overflow-hidden"
                 style={{ minHeight: '160px' }}
-                onClick={() => item.photo_url ? setViewingPhoto(item) : openPhotoDialog(item)}
+                onClick={() => item.image_url ? setViewingPhoto(item) : openPhotoDialog(item)}
               >
-                {item.photo_url ? (
+                {item.image_url ? (
                   <>
                     <img
-                      src={item.photo_url}
+                      src={item.image_url}
                       alt={item.name}
                       className="w-full max-h-48 object-contain p-2 transition-transform duration-500 group-hover:scale-105"
                       onError={(e) => { e.target.style.display = 'none'; }}
@@ -464,9 +464,9 @@ function StockDashboard() {
             <DialogTitle className="text-lg">{viewingPhoto?.name}</DialogTitle>
           </DialogHeader>
           <div className="flex items-center justify-center p-4">
-            {viewingPhoto?.photo_url && (
+            {viewingPhoto?.image_url && (
               <img
-                src={viewingPhoto.photo_url}
+                src={viewingPhoto.image_url}
                 alt={viewingPhoto.name}
                 className="w-full max-h-[70vh] object-contain rounded-lg"
               />
