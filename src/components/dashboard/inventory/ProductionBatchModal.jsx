@@ -88,17 +88,24 @@ const ProductionBatchModal = ({ isOpen, onClose, ownerId }) => {
     const fetchBatches = async () => {
         setLoading(true);
         try {
-            const { data, error } = await supabase
-                .from('production_history')
-                .select(`
-                    *,
-                    recipe:recipes(image_url)
-                `)
-                .eq('user_id', ownerId)
-                .order('date', { ascending: false });
+            // Fetch history and recipes separately since there is no FK constraint in DB
+            const [historyRes, recipesRes] = await Promise.all([
+                supabase.from('production_history').select('*').eq('user_id', ownerId).order('date', { ascending: false }),
+                supabase.from('recipes').select('id, image_url').eq('user_id', ownerId)
+            ]);
 
-            if (error) throw error;
-            setBatches(data || []);
+            if (historyRes.error) throw historyRes.error;
+
+            const historyData = historyRes.data || [];
+            const recipeData = recipesRes.data || [];
+
+            // Manual Join
+            const joinedData = historyData.map(batch => ({
+                ...batch,
+                recipe: recipeData.find(r => r.id === batch.recipe_id) || null
+            }));
+
+            setBatches(joinedData);
         } catch (error) {
             console.error("Error fetching batches:", error);
             toast({ title: "Gagal memuat data", description: error.message, variant: "destructive" });
