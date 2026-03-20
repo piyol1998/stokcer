@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Package, TrendingUp, Activity, BarChart3, DollarSign, Clock, Coins, Wallet, Store, ChevronRight, AlertTriangle } from 'lucide-react';
 import { supabase } from '@/lib/customSupabaseClient';
 import { useAuth } from '@/contexts/SupabaseAuthContext';
+import { Button } from '@/components/ui/button';
 import RecentActivityWidget from './RecentActivityWidget';
 import ProductionBatchModal from './inventory/ProductionBatchModal';
 
