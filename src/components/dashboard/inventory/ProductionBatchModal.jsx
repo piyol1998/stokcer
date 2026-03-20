@@ -242,28 +242,31 @@ const ProductionBatchModal = ({ isOpen, onClose, ownerId }) => {
             }
 
             // ADD / UPDATE STOCKS (PRODUK JADI)
-            try {
-                const productName = `${selectedBatch.recipe_name} ${size}ml`;
-                const { data: stockData, error: stockFetchError } = await supabase
-                    .from('stocks')
-                    .select('id, quantity')
-                    .eq('name', productName)
-                    .single();
+            const productName = `${selectedBatch.recipe_name} ${size}ml`;
+            const { data: stockData, error: stockFetchError } = await supabase
+                .from('stocks')
+                .select('id, quantity')
+                .eq('name', productName)
+                .single();
 
-                if (stockData) {
-                    const newStockQty = (parseFloat(stockData.quantity) || 0) + count;
-                    await supabase.from('stocks').update({ quantity: newStockQty }).eq('id', stockData.id);
-                } else {
-                    await supabase.from('stocks').insert([{ 
-                        name: productName, 
-                        category: 'Produk Jadi', 
-                        quantity: count, 
-                        selling_price: 0 
-                    }]);
-                }
-            } catch (err) {
-                console.error("Stocks sync error:", err);
+            if (stockFetchError && stockFetchError.code !== 'PGRST116') {
+                throw new Error(`Gagal memuat status Etalase: ${stockFetchError.message}`);
             }
+
+            if (stockData) {
+                const newStockQty = (parseFloat(stockData.quantity) || 0) + count;
+                const { error: stockUpdateErr } = await supabase.from('stocks').update({ quantity: newStockQty }).eq('id', stockData.id);
+                if (stockUpdateErr) throw new Error(`Gagal update stok Produk Jadi: ${stockUpdateErr.message}`);
+            } else {
+                const { error: stockInsertErr } = await supabase.from('stocks').insert([{ 
+                    name: productName, 
+                    category: 'Produk Jadi', 
+                    quantity: count, 
+                    selling_price: 0 
+                }]);
+                if (stockInsertErr) throw new Error(`Gagal menyimpan produk baru di Etalase: ${stockInsertErr.message}`);
+            }
+            // --- STOCKS AUTOMATION END ---
 
             toast({ title: "Berhasil", description: `Tercatat: ${count} botol @ ${size}ml` });
 
