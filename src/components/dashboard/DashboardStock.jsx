@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Package, TrendingUp, Activity, BarChart3, DollarSign, Clock, Coins, Wallet } from 'lucide-react';
+import { Package, TrendingUp, Activity, BarChart3, DollarSign, Clock, Coins, Wallet, Store, ChevronRight, AlertTriangle } from 'lucide-react';
 import { supabase } from '@/lib/customSupabaseClient';
 import { useAuth } from '@/contexts/SupabaseAuthContext';
 import RecentActivityWidget from './RecentActivityWidget';
@@ -13,7 +13,9 @@ const DashboardStock = ({ onNavigate }) => {
     materials: 0,
     production: 0,
     totalModalDikeluarkan: 0,
-    sisaModalBahan: 0
+    sisaModalBahan: 0,
+    finishedGoods: 0,
+    lowStockItems: []
   });
   const [loading, setLoading] = useState(true);
   const [isBatchModalOpen, setIsBatchModalOpen] = useState(false);
@@ -131,18 +133,22 @@ const DashboardStock = ({ onNavigate }) => {
         .eq('user_id', ownerId)
         .is('deleted_at', null);
 
-      // 4. Fetch Production History Count (Batches)
-      const { count: productionCount } = await supabase
-        .from('production_history')
-        .select('*', { count: 'exact', head: true })
+      // 5. Fetch Finished Goods (Stocks)
+      const { data: stockData, count: stockCount } = await supabase
+        .from('stocks')
+        .select('*', { count: 'exact' })
         .eq('user_id', ownerId);
+
+      const lowStockItems = stockData ? stockData.filter(i => (parseFloat(i.quantity) || 0) <= 10).slice(0, 5) : [];
 
       setStats({
         totalModal: totalProductionCost,
         materials: materialCount || 0,
         production: productionCount || 0,
         totalModalDikeluarkan: totalModalDikeluarkan,
-        sisaModalBahan: totalStockValue
+        sisaModalBahan: totalStockValue,
+        finishedGoods: stockCount || 0,
+        lowStockItems: lowStockItems
       });
     } catch (error) {
       console.error('Error fetching stats:', error);
@@ -210,8 +216,8 @@ const DashboardStock = ({ onNavigate }) => {
         </div>
       </div>
 
-      {/* Financial Metrics Row */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      {/* Financial & Operational Metrics Row */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <Card
           onClick={() => onNavigate && onNavigate('history')}
           title="Total Modal Dikeluarkan"
@@ -242,9 +248,17 @@ const DashboardStock = ({ onNavigate }) => {
           watermarkIcon={Coins}
           isCurrency={true}
         />
+        <Card
+          onClick={() => onNavigate && onNavigate('stocks')}
+          title="Total Jenis Produk Jadi"
+          value={stats.finishedGoods}
+          icon={Store}
+          colorClass="text-indigo-500"
+          label="ETALASE"
+          watermarkIcon={Store}
+        />
       </div>
 
-      {/* Operational Metrics Row */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Card
           onClick={() => onNavigate && onNavigate('materials')}
@@ -266,13 +280,74 @@ const DashboardStock = ({ onNavigate }) => {
         />
       </div>
 
-      {/* Recent Activity Section */}
-      <div className="grid grid-cols-1">
-        <RecentActivityWidget
-          userId={ownerId}
-          onNavigate={onNavigate}
-          onOpenProduction={() => setIsBatchModalOpen(true)}
-        />
+      {/* Middle Section: Produk Jadi & Recent Activity */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Produk Jadi Quick View */}
+        <div className="lg:col-span-1 bg-[#1e293b] border border-slate-800 rounded-3xl p-6 shadow-xl flex flex-col h-[500px]">
+             <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-indigo-500/20 flex items-center justify-center text-indigo-400">
+                        <Store className="w-5 h-5" />
+                    </div>
+                    <div>
+                        <h3 className="text-lg font-bold text-white">Stok Produk Jadi</h3>
+                        <p className="text-xs text-slate-400">Status barang siap jual</p>
+                    </div>
+                </div>
+                <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => onNavigate && onNavigate('stocks')}
+                    className="text-slate-400 hover:text-white"
+                >
+                    Lihat Semua <ChevronRight className="w-4 h-4 ml-1" />
+                </Button>
+             </div>
+
+             <div className="flex-1 space-y-4 overflow-y-auto pr-2 scrollbar-hide">
+                {stats.lowStockItems.length > 0 ? (
+                    stats.lowStockItems.map(item => (
+                        <div key={item.id} className="flex items-center justify-between p-3 rounded-2xl bg-slate-900/50 border border-slate-800/50 hover:border-slate-700 transition-colors">
+                            <div className="flex-1 min-w-0 mr-4">
+                                <p className="text-sm font-medium text-white truncate">{item.name}</p>
+                                <p className="text-[10px] text-slate-500">{item.category || 'Produk'}</p>
+                            </div>
+                            <div className="text-right">
+                                <div className="flex items-center gap-1.5 justify-end">
+                                    <span className={`text-sm font-bold ${item.quantity <= 10 ? 'text-red-400' : 'text-emerald-400'}`}>
+                                        {item.quantity}
+                                    </span>
+                                    <span className="text-[10px] text-slate-500 lowercase">pcs</span>
+                                </div>
+                                {item.quantity <= 10 && (
+                                    <span className="text-[10px] text-red-500/80 font-medium">Stok Tipis</span>
+                                )}
+                            </div>
+                        </div>
+                    ))
+                ) : (
+                    <div className="h-full flex flex-col items-center justify-center text-slate-600 opacity-50 space-y-2">
+                        <Package className="w-8 h-8" />
+                        <p className="text-sm">Belum ada produk...</p>
+                    </div>
+                )}
+             </div>
+
+             {stats.finishedGoods > 5 && (
+                 <p className="mt-4 text-center text-[11px] text-slate-500 italic">
+                    +{stats.finishedGoods - 5} produk lainnya di etalase
+                 </p>
+             )}
+        </div>
+
+        {/* Recent Activity Section */}
+        <div className="lg:col-span-2">
+            <RecentActivityWidget
+                userId={ownerId}
+                onNavigate={onNavigate}
+                onOpenProduction={() => setIsBatchModalOpen(true)}
+            />
+        </div>
       </div>
 
       <ProductionBatchModal
