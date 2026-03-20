@@ -243,6 +243,16 @@ const ProductionBatchModal = ({ isOpen, onClose, ownerId }) => {
 
             // ADD / UPDATE STOCKS (PRODUK JADI)
             const productName = `${selectedBatch.recipe_name} ${size}ml`;
+            
+            // Get recipe image if available
+            const { data: recipeData } = await supabase
+                .from('recipes')
+                .select('image_url, metadata')
+                .eq('id', selectedBatch.recipe_id)
+                .single();
+            
+            const recipeImage = recipeData?.image_url || recipeData?.metadata?.photo_url || null;
+
             const { data: stockData, error: stockFetchError } = await supabase
                 .from('stocks')
                 .select('id, quantity')
@@ -256,7 +266,10 @@ const ProductionBatchModal = ({ isOpen, onClose, ownerId }) => {
 
             if (stockData) {
                 const newStockQty = (parseFloat(stockData.quantity) || 0) + count;
-                const { error: stockUpdateErr } = await supabase.from('stocks').update({ quantity: newStockQty }).eq('id', stockData.id);
+                const { error: stockUpdateErr } = await supabase.from('stocks').update({ 
+                    quantity: newStockQty,
+                    image_url: recipeImage // Sync image on update too
+                }).eq('id', stockData.id);
                 if (stockUpdateErr) throw new Error(`Gagal update stok Produk Jadi: ${stockUpdateErr.message}`);
             } else {
                 const { error: stockInsertErr } = await supabase.from('stocks').insert([{ 
@@ -264,7 +277,8 @@ const ProductionBatchModal = ({ isOpen, onClose, ownerId }) => {
                     category: 'Produk Jadi', 
                     quantity: count, 
                     selling_price: 0,
-                    user_id: ownerId
+                    user_id: ownerId,
+                    image_url: recipeImage // Set image on create
                 }]);
                 if (stockInsertErr) throw new Error(`Gagal menyimpan produk baru di Etalase: ${stockInsertErr.message}`);
             }
