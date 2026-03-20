@@ -4,7 +4,8 @@ import MaterialsList from '@/components/dashboard/inventory/MaterialsList';
 import RecipeGrid from '@/components/dashboard/inventory/RecipeGrid';
 import ProductionHistory from '@/components/dashboard/inventory/ProductionHistory';
 import NewProduction from '@/components/dashboard/inventory/NewProduction';
-import { Package, ChefHat, History, Factory, AlertTriangle } from 'lucide-react';
+import StockDashboard from '@/components/dashboard/inventory/StockDashboard';
+import { Package, ChefHat, History, Factory, AlertTriangle, Store } from 'lucide-react';
 
 const InventoryManagement = ({ onUpdate, initialTab = "materials" }) => {
   const [activeTab, setActiveTab] = useState(initialTab);
@@ -53,6 +54,14 @@ const InventoryManagement = ({ onUpdate, initialTab = "materials" }) => {
               <History className="w-4 h-4 mr-2" />
               Riwayat Produksi
             </TabsTrigger>
+
+            <TabsTrigger
+              value="stocks"
+              className="flex-shrink-0 min-w-[120px] px-4 py-2.5 data-[state=active]:bg-indigo-600 data-[state=active]:text-white data-[state=active]:shadow-lg transition-all"
+            >
+              <Store className="w-4 h-4 mr-2" />
+              Produk Jadi
+            </TabsTrigger>
           </TabsList>
         </div>
 
@@ -71,6 +80,10 @@ const InventoryManagement = ({ onUpdate, initialTab = "materials" }) => {
 
           <TabsContent value="history" className="focus-visible:outline-none animate-in fade-in-50 slide-in-from-bottom-2 duration-300">
             <ProductionHistory />
+          </TabsContent>
+
+          <TabsContent value="stocks" className="focus-visible:outline-none animate-in fade-in-50 slide-in-from-bottom-2 duration-300">
+            <StockDashboard />
           </TabsContent>
         </div>
       </Tabs>
