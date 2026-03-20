@@ -134,6 +134,12 @@ const DashboardStock = ({ onNavigate }) => {
         .eq('user_id', ownerId)
         .is('deleted_at', null);
 
+      // 4. Fetch Production History Count (Batches)
+      const { count: productionCount } = await supabase
+        .from('production_history')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', ownerId);
+
       // 5. Fetch Finished Goods (Stocks)
       const { data: stockData, count: stockCount } = await supabase
         .from('stocks')
