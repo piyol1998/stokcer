@@ -56,7 +56,8 @@ const ProductionBatchModal = ({ isOpen, onClose, ownerId }) => {
         bottleMaterialId: '',
         boxMaterialId: '',
         extraMaterialId: '',
-        manualExtraCost: ''
+        manualExtraCost: '',
+        type: 'ready' // 'ready' (stock) or 'sold' (direct out)
     });
     const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -172,6 +173,7 @@ const ProductionBatchModal = ({ isOpen, onClose, ownerId }) => {
                 id: Date.now().toString(), // simple ID
                 date: new Date().toISOString(),
                 user_date: bottlingForm.date,
+                type: bottlingForm.type,
                 bottle_size: size,
                 bottle_count: count,
                 total_ml: totalUsed,
@@ -241,53 +243,55 @@ const ProductionBatchModal = ({ isOpen, onClose, ownerId }) => {
                 setMaterials(localMatUpdates);
             }
 
-            // ADD / UPDATE STOCKS (PRODUK JADI)
-            const productName = `${selectedBatch.recipe_name} ${size}ml`;
-            
-            // Get recipe image if available
-            const { data: recipeData } = await supabase
-                .from('recipes')
-                .select('image_url, metadata')
-                .eq('id', selectedBatch.recipe_id)
-                .single();
-            
-            const recipeImage = recipeData?.image_url || recipeData?.metadata?.photo_url || null;
+            // ADD / UPDATE STOCKS (PRODUK JADI) - ONLY IF READY STOCK
+            if (bottlingForm.type === 'ready') {
+                const productName = `${selectedBatch.recipe_name} ${size}ml`;
+                
+                // Get recipe image if available
+                const { data: recipeData } = await supabase
+                    .from('recipes')
+                    .select('image_url, metadata')
+                    .eq('id', selectedBatch.recipe_id)
+                    .single();
+                
+                const recipeImage = recipeData?.image_url || recipeData?.metadata?.photo_url || null;
 
-            const { data: stockData, error: stockFetchError } = await supabase
-                .from('stocks')
-                .select('id, quantity')
-                .eq('name', productName)
-                .eq('user_id', ownerId)
-                .single();
+                const { data: stockData, error: stockFetchError } = await supabase
+                    .from('stocks')
+                    .select('id, quantity')
+                    .eq('name', productName)
+                    .eq('user_id', ownerId)
+                    .single();
 
-            if (stockFetchError && stockFetchError.code !== 'PGRST116') {
-                throw new Error(`Gagal memuat status Etalase: ${stockFetchError.message}`);
-            }
+                if (stockFetchError && stockFetchError.code !== 'PGRST116') {
+                    throw new Error(`Gagal memuat status Etalase: ${stockFetchError.message}`);
+                }
 
-            if (stockData) {
-                const newStockQty = (parseFloat(stockData.quantity) || 0) + count;
-                const { error: stockUpdateErr } = await supabase.from('stocks').update({ 
-                    quantity: newStockQty,
-                    image_url: recipeImage // Sync image on update too
-                }).eq('id', stockData.id);
-                if (stockUpdateErr) throw new Error(`Gagal update stok Produk Jadi: ${stockUpdateErr.message}`);
-            } else {
-                const { error: stockInsertErr } = await supabase.from('stocks').insert([{ 
-                    name: productName, 
-                    category: 'Produk Jadi', 
-                    quantity: count, 
-                    selling_price: 0,
-                    user_id: ownerId,
-                    image_url: recipeImage // Set image on create
-                }]);
-                if (stockInsertErr) throw new Error(`Gagal menyimpan produk baru di Etalase: ${stockInsertErr.message}`);
+                if (stockData) {
+                    const newStockQty = (parseFloat(stockData.quantity) || 0) + count;
+                    const { error: stockUpdateErr } = await supabase.from('stocks').update({ 
+                        quantity: newStockQty,
+                        image_url: recipeImage // Sync image on update too
+                    }).eq('id', stockData.id);
+                    if (stockUpdateErr) throw new Error(`Gagal update stok Produk Jadi: ${stockUpdateErr.message}`);
+                } else {
+                    const { error: stockInsertErr } = await supabase.from('stocks').insert([{ 
+                        name: productName, 
+                        category: 'Produk Jadi', 
+                        quantity: count, 
+                        selling_price: 0,
+                        user_id: ownerId,
+                        image_url: recipeImage // Set image on create
+                    }]);
+                    if (stockInsertErr) throw new Error(`Gagal menyimpan produk baru di Etalase: ${stockInsertErr.message}`);
+                }
             }
             // --- STOCKS AUTOMATION END ---
 
             toast({ title: "Berhasil", description: `Tercatat: ${count} botol @ ${size}ml` });
 
             // Reset form (keep date)
-            setBottlingForm(prev => ({ ...prev, size: '', count: '', description: '', bottleMaterialId: '', boxMaterialId: '', extraMaterialId: '', manualExtraCost: '' }));
+            setBottlingForm(prev => ({ ...prev, size: '', count: '', description: '', bottleMaterialId: '', boxMaterialId: '', extraMaterialId: '', manualExtraCost: '', type: 'ready' }));
 
         } catch (error) {
             console.error("Bottling Error:", error);
@@ -579,6 +583,26 @@ const ProductionBatchModal = ({ isOpen, onClose, ownerId }) => {
                                         <Wine className="w-5 h-5 text-pink-400" />
                                         <h3 className="font-semibold text-white">Catat Pembotolan Baru</h3>
                                     </div>
+                                    <div className="mb-4">
+                                        <div className="grid grid-cols-2 gap-2 p-1 bg-slate-800/80 rounded-lg border border-slate-700">
+                                            <button
+                                                type="button"
+                                                onClick={() => setBottlingForm({ ...bottlingForm, type: 'ready' })}
+                                                className={`flex items-center justify-center gap-2 py-2 rounded-md text-xs font-semibold transition-all ${bottlingForm.type === 'ready' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'}`}
+                                            >
+                                                <Wine className="w-3.5 h-3.5" />
+                                                Ready Stock
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setBottlingForm({ ...bottlingForm, type: 'sold' })}
+                                                className={`flex items-center justify-center gap-2 py-2 rounded-md text-xs font-semibold transition-all ${bottlingForm.type === 'sold' ? 'bg-pink-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'}`}
+                                            >
+                                                <MoreHorizontal className="w-3.5 h-3.5" />
+                                                Terjual / Sample
+                                            </button>
+                                        </div>
+                                    </div>
                                     <form onSubmit={handleSaveBottling} className="space-y-4">
                                         <div className="grid grid-cols-2 gap-4">
                                             <div className="space-y-2">
@@ -735,8 +759,12 @@ const ProductionBatchModal = ({ isOpen, onClose, ownerId }) => {
                                                                     <div className="text-sm font-medium text-slate-200">
                                                                         {log.bottle_count} botol x {log.bottle_size} ml
                                                                     </div>
-                                                                    <div className="text-xs text-slate-500 mt-1">
-                                                                        {format(new Date(log.user_date || log.date), 'dd MMM yyyy')}
+                                                                    <div className="flex items-center gap-2 text-xs text-slate-500 mt-1">
+                                                                        <span>{format(new Date(log.user_date || log.date), 'dd MMM yyyy')}</span>
+                                                                        <span className="text-slate-800">•</span>
+                                                                        <Badge variant="outline" className={`text-[9px] px-1 py-0 leading-none ${log.type === 'sold' ? 'bg-pink-500/10 text-pink-400 border-pink-500/20' : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'}`}>
+                                                                            {log.type === 'sold' ? 'Terjual / Keluar' : 'Ready Stock'}
+                                                                        </Badge>
                                                                     </div>
                                                                     {log.description && (
                                                                         <div className="text-xs text-slate-400 mt-1 italic">

@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/customSupabaseClient';
-import { Boxes, AlertTriangle, CheckCircle, Search, Edit2, DollarSign, Trash2, ImagePlus, X, Camera, RefreshCw } from 'lucide-react';
+import { Boxes, AlertTriangle, CheckCircle, Search, Edit2, DollarSign, Trash2, ImagePlus, X, Camera, RefreshCw, ShoppingBag, Filter, Package } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/contexts/SupabaseAuthContext';
 import { useToast } from '@/components/ui/use-toast';
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
 
 function StockDashboard() {
   const { user, ownerId } = useAuth();
@@ -14,6 +16,7 @@ function StockDashboard() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [activeTab, setActiveTab] = useState('ready'); // ready, sold-out, all
 
   // Edit Price State
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -216,13 +219,21 @@ function StockDashboard() {
     }
   };
 
-  const filtered = items.filter(i => i.name.toLowerCase().includes(searchTerm.toLowerCase()));
+  const filtered = items.filter(i => {
+    const matchesSearch = i.name.toLowerCase().includes(searchTerm.toLowerCase());
+    if (activeTab === 'ready') return matchesSearch && i.quantity > 0;
+    if (activeTab === 'sold-out') return matchesSearch && i.quantity === 0;
+    return matchesSearch;
+  });
+
+  const readyCount = items.filter(i => i.quantity > 0).length;
+  const soldOutCount = items.filter(i => i.quantity === 0).length;
 
   if (loading) return <div className="p-8 text-center text-slate-500">Memuat dashboard stok...</div>;
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-2">
         <div className="flex items-center gap-3">
           <Boxes className="w-6 h-6 text-indigo-400" />
           <h2 className="text-xl font-bold text-white">Dashboard Stok Produk Jadi</h2>
@@ -238,12 +249,38 @@ function StockDashboard() {
         </div>
       </div>
 
+      {/* Tabs & Stats */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-slate-900/40 p-2 rounded-xl border border-slate-800/50">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full sm:w-auto">
+          <TabsList className="bg-slate-900 border border-slate-800">
+            <TabsTrigger value="ready" className="data-[state=active]:bg-indigo-600">
+              Ready Stock
+              <Badge className="ml-2 bg-indigo-500/20 text-white border-none h-4 px-1.5 text-[10px]">{readyCount}</Badge>
+            </TabsTrigger>
+            <TabsTrigger value="sold-out" className="data-[state=active]:bg-pink-600">
+              Stok Habis
+              <Badge className="ml-2 bg-pink-500/20 text-white border-none h-4 px-1.5 text-[10px]">{soldOutCount}</Badge>
+            </TabsTrigger>
+            <TabsTrigger value="all">Semua</TabsTrigger>
+          </TabsList>
+        </Tabs>
+        
+        <div className="flex gap-4 px-2">
+          <div className="text-center">
+            <p className="text-[10px] text-slate-500 uppercase tracking-wider">Total Produk</p>
+            <p className="text-sm font-bold text-white">{items.length}</p>
+          </div>
+        </div>
+      </div>
+
       {/* Product Grid View */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {filtered.map((item) => {
-          const isLow = item.quantity <= 10;
+          const isLow = item.quantity > 0 && item.quantity <= 10;
+          const isSoldOut = item.quantity === 0;
+
           return (
-            <div key={item.id} className="bg-[#1e293b] rounded-xl border border-slate-700/50 overflow-hidden shadow-lg hover:shadow-xl hover:border-indigo-500/30 transition-all group flex flex-col">
+            <div key={item.id} className={`bg-[#1e293b] rounded-xl border border-slate-700/50 overflow-hidden shadow-lg hover:shadow-xl transition-all group flex flex-col ${isSoldOut ? 'opacity-70 grayscale-[0.5]' : 'hover:border-indigo-500/30'}`}>
               {/* Photo Section */}
               <div 
                 className="relative w-full bg-slate-900/80 flex items-center justify-center cursor-pointer overflow-hidden"
@@ -279,19 +316,26 @@ function StockDashboard() {
                     <span className="text-[10px] font-medium">Tambah Foto</span>
                   </div>
                 )}
+
+                {/* Sold Out Overlay Badge */}
+                {isSoldOut && (
+                  <div className="absolute top-2 right-2">
+                    <Badge className="bg-red-500 text-white border-none shadow-lg px-2 py-0.5 text-[10px] uppercase font-bold tracking-tighter">STOK HABIS</Badge>
+                  </div>
+                )}
               </div>
 
               {/* Product Info */}
               <div className="p-4 flex-1 flex flex-col gap-3">
                 <div>
                   <h3 className="text-sm font-bold text-white leading-tight">{item.name}</h3>
-                  <p className="text-[10px] text-slate-500 mt-0.5">{item.category || 'Produk'}</p>
+                  <p className="text-[10px] text-slate-500 mt-0.5">{item.category || 'Produk Jadi'}</p>
                 </div>
 
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-[10px] text-slate-500 uppercase tracking-wider">Stok</p>
-                    <p className="text-lg font-bold text-white">{item.quantity}</p>
+                    <p className={`text-lg font-bold ${isSoldOut ? 'text-red-400' : 'text-white'}`}>{item.quantity}</p>
                   </div>
                   <div className="text-right">
                     <p className="text-[10px] text-slate-500 uppercase tracking-wider">Harga Jual</p>
@@ -302,15 +346,20 @@ function StockDashboard() {
                 </div>
 
                 <div className="flex items-center justify-between pt-2 border-t border-slate-700/30">
-                  {isLow ? (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-red-500/10 text-red-400 border border-red-500/20">
+                  {isSoldOut ? (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-red-500/10 text-red-500 border border-red-500/20">
+                      <X className="w-3 h-3" />
+                      Sold Out
+                    </span>
+                  ) : isLow ? (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-500/10 text-amber-500 border border-amber-500/20">
                       <AlertTriangle className="w-3 h-3" />
-                      Low
+                      Low Stok
                     </span>
                   ) : (
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                       <CheckCircle className="w-3 h-3" />
-                      Ok
+                      Tersedia
                     </span>
                   )}
                   <div className="flex items-center gap-1">
@@ -335,8 +384,11 @@ function StockDashboard() {
           );
         })}
         {filtered.length === 0 && (
-          <div className="col-span-full text-center py-12 text-slate-500">
-            Data stok kosong
+          <div className="col-span-full text-center py-20 bg-slate-900/20 rounded-2xl border border-dashed border-slate-800">
+            <Package className="w-10 h-10 text-slate-700 mx-auto mb-3" />
+            <p className="text-slate-500 font-medium">
+              {activeTab === 'sold-out' ? 'Tidak ada produk yang habis terjual' : 'Belum ada produk siap jual'}
+            </p>
           </div>
         )}
       </div>
