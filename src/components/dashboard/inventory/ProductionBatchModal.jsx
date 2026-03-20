@@ -247,6 +247,7 @@ const ProductionBatchModal = ({ isOpen, onClose, ownerId }) => {
                 .from('stocks')
                 .select('id, quantity')
                 .eq('name', productName)
+                .eq('user_id', ownerId)
                 .single();
 
             if (stockFetchError && stockFetchError.code !== 'PGRST116') {
@@ -262,7 +263,8 @@ const ProductionBatchModal = ({ isOpen, onClose, ownerId }) => {
                     name: productName, 
                     category: 'Produk Jadi', 
                     quantity: count, 
-                    selling_price: 0 
+                    selling_price: 0,
+                    user_id: ownerId
                 }]);
                 if (stockInsertErr) throw new Error(`Gagal menyimpan produk baru di Etalase: ${stockInsertErr.message}`);
             }
@@ -353,6 +355,7 @@ const ProductionBatchModal = ({ isOpen, onClose, ownerId }) => {
                         .from('stocks')
                         .select('id, quantity')
                         .eq('name', productName)
+                        .eq('user_id', ownerId)
                         .single();
                         
                     if (stockData) {

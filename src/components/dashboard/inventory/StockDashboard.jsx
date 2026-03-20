@@ -9,7 +9,7 @@ import { useAuth } from '@/contexts/SupabaseAuthContext';
 import { useToast } from '@/components/ui/use-toast';
 
 function StockDashboard() {
-  const { user } = useAuth();
+  const { user, ownerId } = useAuth();
   const { toast } = useToast();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -21,14 +21,19 @@ function StockDashboard() {
   const [newPrice, setNewPrice] = useState('');
 
   useEffect(() => {
-    fetchItems();
-  }, [user]);
+    if (ownerId) {
+      fetchItems();
+    }
+  }, [ownerId]);
 
   const fetchItems = async () => {
+    if (!ownerId) return;
+    
     try {
       const { data, error } = await supabase
         .from('stocks')
         .select('*')
+        .eq('user_id', ownerId)
         .order('name');
       
       if (error) throw error;
