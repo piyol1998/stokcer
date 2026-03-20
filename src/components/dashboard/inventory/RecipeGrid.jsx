@@ -371,7 +371,7 @@ function RecipeGrid({ onUpdate }) {
             const filePath = `recipe-photos/${fileName}`;
 
             const { error: uploadError } = await supabase.storage
-                .from('recipe-photos')
+                .from('product-images')
                 .upload(filePath, photoFile, {
                     cacheControl: '3600',
                     upsert: true
@@ -379,23 +379,11 @@ function RecipeGrid({ onUpdate }) {
 
             if (uploadError) {
                 console.error('Upload error:', uploadError);
-                // Fallback: try public bucket
-                const { error: uploadError2 } = await supabase.storage
-                    .from('public')
-                    .upload(`recipe-photos/${fileName}`, photoFile, {
-                        cacheControl: '3600',
-                        upsert: true
-                    });
-                if (uploadError2) {
-                    console.error('Fallback upload error:', uploadError2);
-                    toast({ title: "Info", description: "Foto tidak bisa diupload. Pastikan bucket 'recipe-photos' sudah dibuat di Supabase Storage.", variant: "destructive" });
-                    return existingPhotoUrl;
-                }
-                const { data: urlData } = supabase.storage.from('public').getPublicUrl(`recipe-photos/${fileName}`);
-                return urlData?.publicUrl || null;
+                toast({ title: "Error", description: "Gagal mengupload foto. Silakan coba lagi.", variant: "destructive" });
+                return existingPhotoUrl;
             }
 
-            const { data: urlData } = supabase.storage.from('recipe-photos').getPublicUrl(filePath);
+            const { data: urlData } = supabase.storage.from('product-images').getPublicUrl(filePath);
             return urlData?.publicUrl || null;
         } catch (err) {
             console.error('Photo upload failed:', err);
