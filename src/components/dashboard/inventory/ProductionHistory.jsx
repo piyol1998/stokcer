@@ -33,16 +33,22 @@ function ProductionHistory() {
             const [histData, matData, rezData] = await Promise.all([
                 supabase.from('production_history').select('*').order('date', { ascending: false }),
                 supabase.from('raw_materials').select('*'),
-                supabase.from('recipes').select('id, image_url')
+                supabase.from('recipes').select('id, image_url, metadata')
             ]);
 
             const hData = histData.data || [];
             const rData = rezData.data || [];
 
-            const joined = hData.map(item => ({
-                ...item,
-                recipe: rData.find(r => r.id === item.recipe_id) || null
-            }));
+            const joined = hData.map(item => {
+                const r = rData.find(rec => rec.id === item.recipe_id);
+                return {
+                    ...item,
+                    recipe: r ? {
+                        ...r,
+                        image_url: r.image_url || r.metadata?.photo_url || null
+                    } : null
+                };
+            });
 
             setHistory(joined);
             setMaterials(matData.data || []);

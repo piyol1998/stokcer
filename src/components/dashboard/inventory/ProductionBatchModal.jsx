@@ -91,7 +91,7 @@ const ProductionBatchModal = ({ isOpen, onClose, ownerId }) => {
             // Fetch history and recipes separately since there is no FK constraint in DB
             const [historyRes, recipesRes] = await Promise.all([
                 supabase.from('production_history').select('*').eq('user_id', ownerId).order('date', { ascending: false }),
-                supabase.from('recipes').select('id, image_url').eq('user_id', ownerId)
+                supabase.from('recipes').select('id, image_url, metadata').eq('user_id', ownerId)
             ]);
 
             if (historyRes.error) throw historyRes.error;
@@ -99,11 +99,17 @@ const ProductionBatchModal = ({ isOpen, onClose, ownerId }) => {
             const historyData = historyRes.data || [];
             const recipeData = recipesRes.data || [];
 
-            // Manual Join
-            const joinedData = historyData.map(batch => ({
-                ...batch,
-                recipe: recipeData.find(r => r.id === batch.recipe_id) || null
-            }));
+            // Manual Join with fallback to metadata
+            const joinedData = historyData.map(batch => {
+                const r = recipeData.find(rec => rec.id === batch.recipe_id);
+                return {
+                    ...batch,
+                    recipe: r ? {
+                        ...r,
+                        image_url: r.image_url || r.metadata?.photo_url || null
+                    } : null
+                };
+            });
 
             setBatches(joinedData);
         } catch (error) {
