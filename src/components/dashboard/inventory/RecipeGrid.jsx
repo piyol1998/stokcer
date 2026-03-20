@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/customSupabaseClient';
-import { BookOpen, Plus, Trash2, Edit2, FlaskConical, Component, Leaf, Info, Calculator, Wand2, RefreshCw, Beaker, FileSpreadsheet, ChevronDown, Search, Check, ChevronsUpDown } from 'lucide-react';
+import { BookOpen, Plus, Trash2, Edit2, FlaskConical, Component, Leaf, Info, Calculator, Wand2, RefreshCw, Beaker, FileSpreadsheet, ChevronDown, Search, Check, ChevronsUpDown, ImagePlus, X, Camera } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -242,6 +242,13 @@ function RecipeGrid({ onUpdate }) {
     const [editingRecipe, setEditingRecipe] = useState(null);
     const [activeTab, setActiveTab] = useState("manual");
 
+    // Photo State
+    const [photoFile, setPhotoFile] = useState(null);
+    const [photoPreview, setPhotoPreview] = useState(null);
+    const [uploadingPhoto, setUploadingPhoto] = useState(false);
+    const [existingPhotoUrl, setExistingPhotoUrl] = useState(null);
+    const fileInputRef = useRef(null);
+
     // Form State
     const [generalInfo, setGeneralInfo] = useState({
         name: '',
@@ -312,13 +319,112 @@ function RecipeGrid({ onUpdate }) {
         }
     };
 
+    // Photo handlers
+    const handlePhotoSelect = (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        if (file.size > 5 * 1024 * 1024) {
+            toast({ title: "Error", description: "Ukuran file maksimal 5MB", variant: "destructive" });
+            return;
+        }
+        if (!file.type.startsWith('image/')) {
+            toast({ title: "Error", description: "File harus berformat gambar (JPG, PNG, WebP)", variant: "destructive" });
+            return;
+        }
+        setPhotoFile(file);
+        const reader = new FileReader();
+        reader.onload = (e) => setPhotoPreview(e.target.result);
+        reader.readAsDataURL(file);
+    };
+
+    const handlePhotoDrop = (e) => {
+        e.preventDefault();
+        const file = e.dataTransfer.files?.[0];
+        if (!file) return;
+        if (file.size > 5 * 1024 * 1024) {
+            toast({ title: "Error", description: "Ukuran file maksimal 5MB", variant: "destructive" });
+            return;
+        }
+        if (!file.type.startsWith('image/')) {
+            toast({ title: "Error", description: "File harus berformat gambar", variant: "destructive" });
+            return;
+        }
+        setPhotoFile(file);
+        const reader = new FileReader();
+        reader.onload = (e) => setPhotoPreview(e.target.result);
+        reader.readAsDataURL(file);
+    };
+
+    const handleRemovePhoto = () => {
+        setPhotoFile(null);
+        setPhotoPreview(null);
+        setExistingPhotoUrl(null);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+    };
+
+    const uploadPhoto = async (recipeId) => {
+        if (!photoFile) return existingPhotoUrl;
+        setUploadingPhoto(true);
+        try {
+            const fileExt = photoFile.name.split('.').pop();
+            const fileName = `recipe-${recipeId}-${Date.now()}.${fileExt}`;
+            const filePath = `recipe-photos/${fileName}`;
+
+            const { error: uploadError } = await supabase.storage
+                .from('recipe-photos')
+                .upload(filePath, photoFile, {
+                    cacheControl: '3600',
+                    upsert: true
+                });
+
+            if (uploadError) {
+                console.error('Upload error:', uploadError);
+                // Fallback: try public bucket
+                const { error: uploadError2 } = await supabase.storage
+                    .from('public')
+                    .upload(`recipe-photos/${fileName}`, photoFile, {
+                        cacheControl: '3600',
+                        upsert: true
+                    });
+                if (uploadError2) {
+                    console.error('Fallback upload error:', uploadError2);
+                    toast({ title: "Info", description: "Foto tidak bisa diupload. Pastikan bucket 'recipe-photos' sudah dibuat di Supabase Storage.", variant: "destructive" });
+                    return existingPhotoUrl;
+                }
+                const { data: urlData } = supabase.storage.from('public').getPublicUrl(`recipe-photos/${fileName}`);
+                return urlData?.publicUrl || null;
+            }
+
+            const { data: urlData } = supabase.storage.from('recipe-photos').getPublicUrl(filePath);
+            return urlData?.publicUrl || null;
+        } catch (err) {
+            console.error('Photo upload failed:', err);
+            return existingPhotoUrl;
+        } finally {
+            setUploadingPhoto(false);
+        }
+    };
+
     const handleOpenDialog = (recipe = null) => {
+        // Reset photo state
+        setPhotoFile(null);
+        setPhotoPreview(null);
+        setExistingPhotoUrl(null);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+
         if (recipe) {
             setEditingRecipe(recipe);
             setGeneralInfo({
                 name: recipe.name,
                 description: recipe.description || ''
             });
+
+            // Load existing photo
+            const photoUrl = recipe.metadata?.photo_url || recipe.photo_url || null;
+            if (photoUrl) {
+                setExistingPhotoUrl(photoUrl);
+                setPhotoPreview(photoUrl);
+            }
 
             if (recipe.method === 'wizard' && recipe.metadata) {
                 setActiveTab("wizard");
@@ -567,6 +673,20 @@ function RecipeGrid({ onUpdate }) {
                 }
             }
 
+            // Upload photo first to get URL (we use a temp ID for new recipes)
+            let photoUrl = existingPhotoUrl;
+            const tempId = editingRecipe?.id || `new-${Date.now()}`;
+            if (photoFile) {
+                photoUrl = await uploadPhoto(tempId);
+            }
+            // If photo was removed (no preview and no file)
+            if (!photoPreview && !photoFile) {
+                photoUrl = null;
+            }
+
+            // Add photo_url to metadata
+            metadata.photo_url = photoUrl;
+
             const recipePayload = {
                 user_id: user.id,
                 name: generalInfo.name,
@@ -811,6 +931,18 @@ function RecipeGrid({ onUpdate }) {
 
                         return (
                             <div key={recipe.id} className={`bg-[#1e293b] rounded-xl border ${colorTheme.border} ${colorTheme.glow} shadow-lg overflow-hidden flex flex-col h-full hover:shadow-xl transition-all`}>
+                                {/* Recipe Photo */}
+                                {(recipe.metadata?.photo_url || recipe.photo_url) && (
+                                    <div className="relative w-full h-40 overflow-hidden bg-slate-900/50">
+                                        <img
+                                            src={recipe.metadata?.photo_url || recipe.photo_url}
+                                            alt={recipe.name}
+                                            className="w-full h-full object-cover transition-transform duration-500 hover:scale-110"
+                                            onError={(e) => { e.target.style.display = 'none'; }}
+                                        />
+                                        <div className="absolute inset-0 bg-gradient-to-t from-[#1e293b] via-transparent to-transparent" />
+                                    </div>
+                                )}
                                 <div className="p-5 border-b border-slate-700/50 flex justify-between items-start bg-slate-800/30">
                                     <div>
                                         <h3 className={`text-lg font-bold ${colorTheme.text} leading-tight`}>{recipe.name}</h3>
@@ -859,6 +991,77 @@ function RecipeGrid({ onUpdate }) {
                     </DialogHeader>
 
                     <div className="space-y-4 mt-2">
+                        {/* Photo Upload Section */}
+                        <div className="space-y-2">
+                            <Label className="flex items-center gap-2">
+                                <Camera className="w-4 h-4 text-indigo-400" />
+                                Foto Resep
+                            </Label>
+                            {photoPreview ? (
+                                <div className="relative group rounded-xl overflow-hidden border-2 border-indigo-500/30 bg-slate-900/50">
+                                    <img
+                                        src={photoPreview}
+                                        alt="Preview"
+                                        className="w-full h-48 object-cover"
+                                    />
+                                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-all duration-300 flex items-center justify-center">
+                                        <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => fileInputRef.current?.click()}
+                                                className="p-2.5 rounded-full bg-indigo-600/90 hover:bg-indigo-500 text-white shadow-lg transition-all hover:scale-110"
+                                            >
+                                                <ImagePlus className="w-4 h-4" />
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={handleRemovePhoto}
+                                                className="p-2.5 rounded-full bg-red-600/90 hover:bg-red-500 text-white shadow-lg transition-all hover:scale-110"
+                                            >
+                                                <X className="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                    {uploadingPhoto && (
+                                        <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                                            <div className="flex flex-col items-center gap-2">
+                                                <RefreshCw className="w-6 h-6 animate-spin text-indigo-400" />
+                                                <span className="text-xs text-slate-300">Mengupload foto...</span>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            ) : (
+                                <div
+                                    onClick={() => fileInputRef.current?.click()}
+                                    onDragOver={(e) => e.preventDefault()}
+                                    onDrop={handlePhotoDrop}
+                                    className="relative cursor-pointer border-2 border-dashed border-slate-600 hover:border-indigo-500/50 rounded-xl p-8 transition-all duration-300 bg-slate-900/30 hover:bg-indigo-500/5 group"
+                                >
+                                    <div className="flex flex-col items-center gap-3 text-center">
+                                        <div className="p-3 rounded-full bg-slate-800 group-hover:bg-indigo-600/20 transition-colors">
+                                            <ImagePlus className="w-6 h-6 text-slate-500 group-hover:text-indigo-400 transition-colors" />
+                                        </div>
+                                        <div>
+                                            <p className="text-sm text-slate-400 group-hover:text-slate-300 transition-colors font-medium">
+                                                Klik atau drag & drop foto di sini
+                                            </p>
+                                            <p className="text-[10px] text-slate-600 mt-1">
+                                                JPG, PNG, WebP • Maks. 5MB
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                            <input
+                                ref={fileInputRef}
+                                type="file"
+                                accept="image/*"
+                                onChange={handlePhotoSelect}
+                                className="hidden"
+                            />
+                        </div>
+
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2 col-span-2 sm:col-span-1">
                                 <Label>Nama Resep</Label>
