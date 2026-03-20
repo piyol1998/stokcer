@@ -157,8 +157,13 @@ const ProductionBatchModal = ({ isOpen, onClose, ownerId }) => {
 
             const totalUsed = size * count;
 
-            // Cost extraction and calculation for logging
+            // Volume Validation
             const stats = getBatchStats(selectedBatch);
+            if (totalUsed > (stats.remaining + 0.1)) { // Added 0.1 margin for floating point errors
+                throw new Error(`Volume batch tidak mencukupi! Sisa volume: ${stats.remaining} ml. Anda mencoba membotolkan: ${totalUsed} ml.`);
+            }
+
+            // Cost extraction and calculation for logging
             let bottleUnitCost = 0;
             if (bottlingForm.bottleMaterialId) {
                 const botMat = materials.find(m => m.id === bottlingForm.bottleMaterialId);
@@ -632,30 +637,50 @@ const ProductionBatchModal = ({ isOpen, onClose, ownerId }) => {
                                         </div>
                                     </div>
                                     <form onSubmit={handleSaveBottling} className="space-y-4">
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div className="space-y-2">
-                                                <label className="text-xs text-slate-400 font-medium">Ukuran Botol (ml)</label>
-                                                <Input
-                                                    type="number"
-                                                    placeholder="30"
-                                                    className="bg-slate-800 border-slate-700 focus-visible:ring-pink-500"
-                                                    value={bottlingForm.size}
-                                                    onChange={e => setBottlingForm({ ...bottlingForm, size: e.target.value })}
-                                                    required
-                                                />
-                                            </div>
-                                            <div className="space-y-2">
-                                                <label className="text-xs text-slate-400 font-medium">Jumlah Botol (pcs)</label>
-                                                <Input
-                                                    type="number"
-                                                    placeholder="100"
-                                                    className="bg-slate-800 border-slate-700 focus-visible:ring-pink-500"
-                                                    value={bottlingForm.count}
-                                                    onChange={e => setBottlingForm({ ...bottlingForm, count: e.target.value })}
-                                                    required
-                                                />
-                                            </div>
-                                        </div>
+                                        {(() => {
+                                            const stats = getBatchStats(selectedBatch);
+                                            const maxBottles = bottlingForm.size > 0 ? Math.floor(stats.remaining / parseFloat(bottlingForm.size)) : 0;
+                                            return (
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    <div className="space-y-2">
+                                                        <label className="text-xs text-slate-400 font-medium">Ukuran Botol (ml)</label>
+                                                        <Input
+                                                            type="number"
+                                                            placeholder="30"
+                                                            className="bg-slate-800 border-slate-700 focus-visible:ring-pink-500"
+                                                            value={bottlingForm.size}
+                                                            onChange={e => setBottlingForm({ ...bottlingForm, size: e.target.value })}
+                                                            required
+                                                        />
+                                                    </div>
+                                                    <div className="space-y-2">
+                                                        <div className="flex justify-between items-center">
+                                                            <label className="text-xs text-slate-400 font-medium">Jumlah Botol (pcs)</label>
+                                                            {maxBottles > 0 && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => setBottlingForm({ ...bottlingForm, count: maxBottles.toString() })}
+                                                                    className="text-[10px] text-indigo-400 hover:text-indigo-300 font-bold uppercase tracking-tight"
+                                                                >
+                                                                    Maks: {maxBottles}
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                        <Input
+                                                            type="number"
+                                                            placeholder="100"
+                                                            className={`bg-slate-800 border-slate-700 focus-visible:ring-pink-500 ${parseFloat(bottlingForm.count) > maxBottles && maxBottles > 0 ? 'border-red-500/50 text-red-400' : ''}`}
+                                                            value={bottlingForm.count}
+                                                            onChange={e => setBottlingForm({ ...bottlingForm, count: e.target.value })}
+                                                            required
+                                                        />
+                                                        {parseFloat(bottlingForm.count) > maxBottles && maxBottles > 0 && (
+                                                            <p className="text-[10px] text-red-400 animate-pulse">Melebihi sisa volume!</p>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })()}
                                         <div className="grid grid-cols-2 gap-4">
                                             <div className="space-y-2">
                                                 <label className="text-xs text-slate-400 font-medium">Material Botol (Opsional)</label>
