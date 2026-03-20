@@ -241,6 +241,30 @@ const ProductionBatchModal = ({ isOpen, onClose, ownerId }) => {
                 setMaterials(localMatUpdates);
             }
 
+            // ADD / UPDATE STOCKS (PRODUK JADI)
+            try {
+                const productName = `${selectedBatch.recipe_name} ${size}ml`;
+                const { data: stockData, error: stockFetchError } = await supabase
+                    .from('stocks')
+                    .select('id, quantity')
+                    .eq('name', productName)
+                    .single();
+
+                if (stockData) {
+                    const newStockQty = (parseFloat(stockData.quantity) || 0) + count;
+                    await supabase.from('stocks').update({ quantity: newStockQty }).eq('id', stockData.id);
+                } else {
+                    await supabase.from('stocks').insert([{ 
+                        name: productName, 
+                        category: 'Produk Jadi', 
+                        quantity: count, 
+                        selling_price: 0 
+                    }]);
+                }
+            } catch (err) {
+                console.error("Stocks sync error:", err);
+            }
+
             toast({ title: "Berhasil", description: `Tercatat: ${count} botol @ ${size}ml` });
 
             // Reset form (keep date)
@@ -316,6 +340,26 @@ const ProductionBatchModal = ({ isOpen, onClose, ownerId }) => {
                     await Promise.all(updates);
                     setMaterials(localMatUpdates);
                 }
+
+                // --- REVERT STOCKS START ---
+                try {
+                    const productName = `${selectedBatch.recipe_name} ${logToDelete.bottle_size}ml`;
+                    const qtyToRemove = parseFloat(logToDelete.bottle_count) || 0;
+                    
+                    const { data: stockData } = await supabase
+                        .from('stocks')
+                        .select('id, quantity')
+                        .eq('name', productName)
+                        .single();
+                        
+                    if (stockData) {
+                        const newStockQty = Math.max(0, (parseFloat(stockData.quantity) || 0) - qtyToRemove);
+                        await supabase.from('stocks').update({ quantity: newStockQty }).eq('id', stockData.id);
+                    }
+                } catch (err) {
+                    console.error("Revert Stocks error:", err);
+                }
+                // --- REVERT STOCKS END ---
             }
 
             toast({ title: "Berhasil dihapus", description: "Stok telah dikembalikan." });

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/customSupabaseClient';
-import { Boxes, AlertTriangle, CheckCircle, Search, Edit2, DollarSign } from 'lucide-react';
+import { Boxes, AlertTriangle, CheckCircle, Search, Edit2, DollarSign, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
@@ -71,6 +71,20 @@ function StockDashboard() {
     }
   };
 
+  const handleDeleteStock = async (id, name) => {
+    if (!window.confirm(`Yakin ingin menghapus produk "${name}" dari etalase?`)) return;
+
+    try {
+      const { error } = await supabase.from('stocks').delete().eq('id', id);
+      if (error) throw error;
+      
+      toast({ title: "Berhasil", description: `Produk "${name}" dihapus.` });
+      fetchItems();
+    } catch (error) {
+      toast({ title: "Gagal", description: error.message, variant: "destructive" });
+    }
+  };
+
   const filtered = items.filter(i => i.name.toLowerCase().includes(searchTerm.toLowerCase()));
 
   if (loading) return <div className="p-8 text-center text-slate-500">Memuat dashboard stok...</div>;
@@ -131,15 +145,25 @@ function StockDashboard() {
                       )}
                     </td>
                     <td className="px-6 py-4 text-center">
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          onClick={() => openEditPrice(item)}
-                          className="text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/20"
-                        >
-                            <Edit2 className="w-4 h-4 mr-2" />
-                            Set Harga
-                        </Button>
+                        <div className="flex items-center justify-center gap-2">
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={() => openEditPrice(item)}
+                            className="text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/20"
+                          >
+                              <Edit2 className="w-4 h-4 mr-1.5" />
+                              Harga
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={() => handleDeleteStock(item.id, item.name)}
+                            className="text-slate-500 hover:text-red-400 hover:bg-red-500/10 px-2"
+                          >
+                              <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
                     </td>
                   </tr>
                  );
