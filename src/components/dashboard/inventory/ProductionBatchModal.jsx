@@ -506,11 +506,13 @@ const ProductionBatchModal = ({ isOpen, onClose, ownerId }) => {
                                     const percentageLeft = (stats.remaining / stats.totalVolume) * 100;
                                     const batchId = `BATCH-${batch.id.substring(0, 8).toUpperCase()}`;
 
+                                    const isExhausted = stats.remaining <= 0.1; // Using small epsilon for safety
+
                                     return (
                                         <div
                                             key={batch.id}
                                             onClick={() => handleBatchClick(batch)}
-                                            className="group bg-slate-900/50 border border-slate-800 hover:border-indigo-500/50 hover:bg-slate-900 rounded-xl p-4 cursor-pointer transition-all active:scale-[0.99]"
+                                            className={`group bg-slate-900/50 border border-slate-800 hover:border-indigo-500/50 hover:bg-slate-900 rounded-xl p-4 cursor-pointer transition-all active:scale-[0.99] ${isExhausted ? 'opacity-50 grayscale-[0.5]' : ''}`}
                                         >
                                             <div className="flex items-center justify-between">
                                                 <div className="flex items-start gap-4">
@@ -535,13 +537,18 @@ const ProductionBatchModal = ({ isOpen, onClose, ownerId }) => {
                                                             <Badge variant="secondary" className="text-[10px] h-5 px-1.5 bg-slate-800 text-slate-300">
                                                                 {batch.recipe_name}
                                                             </Badge>
+                                                            {isExhausted && (
+                                                                <Badge className="text-[10px] h-5 px-1.5 bg-red-500/20 text-red-400 border-red-500/30 animate-pulse">
+                                                                    HABIS / KOSONG
+                                                                </Badge>
+                                                            )}
                                                         </div>
                                                         <div className="flex items-center gap-4 text-xs text-slate-400">
                                                             <span className="flex items-center gap-1">
                                                                 Total: <span className="text-slate-200 font-semibold">{stats.totalVolume.toLocaleString()} ml</span>
                                                             </span>
                                                             <span className="w-px h-3 bg-slate-700"></span>
-                                                            <span className={`flex items-center gap-1 ${percentageLeft < 20 ? 'text-amber-400' : 'text-emerald-400'}`}>
+                                                            <span className={`flex items-center gap-1 ${isExhausted ? 'text-red-400' : percentageLeft < 20 ? 'text-amber-400' : 'text-emerald-400'}`}>
                                                                 Sisa: <span className="font-bold">{stats.remaining.toLocaleString()} ml</span>
                                                             </span>
                                                         </div>
