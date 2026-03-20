@@ -921,14 +921,13 @@ function RecipeGrid({ onUpdate }) {
                             <div key={recipe.id} className={`bg-[#1e293b] rounded-xl border ${colorTheme.border} ${colorTheme.glow} shadow-lg overflow-hidden flex flex-col h-full hover:shadow-xl transition-all`}>
                                 {/* Recipe Photo */}
                                 {(recipe.metadata?.photo_url || recipe.photo_url) && (
-                                    <div className="relative w-full h-40 overflow-hidden bg-slate-900/50">
+                                    <div className="relative w-full overflow-hidden bg-slate-900/80 flex items-center justify-center p-2">
                                         <img
                                             src={recipe.metadata?.photo_url || recipe.photo_url}
                                             alt={recipe.name}
-                                            className="w-full h-full object-cover transition-transform duration-500 hover:scale-110"
-                                            onError={(e) => { e.target.style.display = 'none'; }}
+                                            className="w-full max-h-52 object-contain rounded-lg transition-transform duration-500 hover:scale-105"
+                                            onError={(e) => { e.target.parentElement.style.display = 'none'; }}
                                         />
-                                        <div className="absolute inset-0 bg-gradient-to-t from-[#1e293b] via-transparent to-transparent" />
                                     </div>
                                 )}
                                 <div className="p-5 border-b border-slate-700/50 flex justify-between items-start bg-slate-800/30">
@@ -986,11 +985,11 @@ function RecipeGrid({ onUpdate }) {
                                 Foto Resep
                             </Label>
                             {photoPreview ? (
-                                <div className="relative group rounded-xl overflow-hidden border-2 border-indigo-500/30 bg-slate-900/50">
+                                <div className="relative group rounded-xl overflow-hidden border-2 border-indigo-500/30 bg-slate-900/80 flex items-center justify-center">
                                     <img
                                         src={photoPreview}
                                         alt="Preview"
-                                        className="w-full h-48 object-cover"
+                                        className="w-full max-h-64 object-contain p-2"
                                     />
                                     <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-all duration-300 flex items-center justify-center">
                                         <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex gap-2">
