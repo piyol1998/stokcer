@@ -14,7 +14,9 @@ import {
     ExternalLink,
     Lock,
     Key,
-    ShieldCheck
+    ShieldCheck,
+    Box,
+    Save
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -28,6 +30,9 @@ function MarketplaceIntegration() {
     const { toast } = useToast();
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const [fetchingStocks, setFetchingStocks] = useState(false);
+    const [stocks, setStocks] = useState([]);
+    const [savingMapId, setSavingMapId] = useState(null);
     
     // Credentials State
     const [tiktokCreds, setTiktokCreds] = useState({
@@ -47,8 +52,26 @@ function MarketplaceIntegration() {
     useEffect(() => {
         if (ownerId) {
             fetchSettings();
+            fetchStocks();
         }
     }, [ownerId]);
+
+    const fetchStocks = async () => {
+        setFetchingStocks(true);
+        try {
+            const { data, error } = await supabase
+                .from('stocks')
+                .select('*')
+                .order('name', { ascending: true });
+            
+            if (error) throw error;
+            setStocks(data || []);
+        } catch (error) {
+            console.error("Fetch stocks error:", error);
+        } finally {
+            setFetchingStocks(false);
+        }
+    };
 
     const fetchSettings = async () => {
         try {
@@ -111,6 +134,33 @@ function MarketplaceIntegration() {
         }
     };
 
+    const handleSaveMapping = async (stockId, tiktokId) => {
+        setSavingMapId(stockId);
+        try {
+            const { error } = await supabase
+                .from('stocks')
+                .update({ tiktok_product_id: tiktokId })
+                .eq('id', stockId);
+
+            if (error) throw error;
+
+            toast({
+                title: "Mapping Berhasil",
+                description: "Produk telah dikaitkan dengan TikTok Shop.",
+            });
+            
+            setStocks(prev => prev.map(s => s.id === stockId ? { ...s, tiktok_product_id: tiktokId } : s));
+        } catch (error) {
+            toast({ title: "Gagal Mapping", description: error.message, variant: "destructive" });
+        } finally {
+            setSavingMapId(null);
+        }
+    };
+
+    const authUrl = tiktokCreds.appKey 
+        ? `https://auth.tiktok-shops.com/oauth/authorize?app_key=${tiktokCreds.appKey}&state=stokcer_auth`
+        : '#';
+
     if (loading) {
         return (
             <div className="flex h-[400px] items-center justify-center">
@@ -137,6 +187,10 @@ function MarketplaceIntegration() {
                     <TabsTrigger value="shopee" className="gap-2 px-6">
                         <Globe className="w-4 h-4" />
                         Shopee
+                    </TabsTrigger>
+                    <TabsTrigger value="mapping" className="gap-2 px-6">
+                        <Box className="w-4 h-4" />
+                        Mapping Produk
                     </TabsTrigger>
                 </TabsList>
 
@@ -251,10 +305,15 @@ function MarketplaceIntegration() {
                                     <p>2. Dapatkan <strong>App Key</strong> dan <strong>App Secret</strong>.</p>
                                     <p>3. Masukkan datanya di form sebelah kiri.</p>
                                     <p>4. Klik tombol di bawah untuk memberikan izin akses ke toko TikTok Anda.</p>
-                                    <Button variant="outline" className="w-full mt-2 border-indigo-500/30 hover:bg-indigo-500/10 text-indigo-400 text-xs">
+                                    <a 
+                                        href={authUrl} 
+                                        target="_blank" 
+                                        rel="noopener noreferrer"
+                                        className={`w-full mt-2 inline-flex items-center justify-center rounded-md text-xs font-medium border transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring h-9 border-indigo-500/30 hover:bg-indigo-500/10 text-indigo-400 ${!tiktokCreds.appKey ? 'opacity-50 pointer-events-none' : ''}`}
+                                    >
                                         Buka Link Otorisasi 
                                         <ExternalLink className="ml-2 w-3 h-3" />
-                                    </Button>
+                                    </a>
                                 </CardContent>
                             </Card>
 
@@ -269,6 +328,56 @@ function MarketplaceIntegration() {
                             </div>
                         </div>
                     </div>
+                </TabsContent>
+
+                {/* Mapping Content */}
+                <TabsContent value="mapping">
+                    <Card className="bg-slate-900/50 border-slate-800">
+                        <CardHeader>
+                            <CardTitle>Mapping Produk Website ke Marketplace</CardTitle>
+                            <CardDescription>
+                                Masukkan ID Produk dari Seller Center untuk setiap parfum agar stok bisa sinkron.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-sm text-left">
+                                    <thead className="bg-slate-950/50 text-slate-400">
+                                        <tr>
+                                            <th className="px-4 py-3 font-medium">Nama Produk</th>
+                                            <th className="px-4 py-3 font-medium">Stok Web</th>
+                                            <th className="px-4 py-3 font-medium">Tiktok Product ID</th>
+                                            <th className="px-4 py-3 font-medium">Aksi</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-800">
+                                        {fetchingStocks ? (
+                                            <tr>
+                                                <td colSpan="4" className="text-center py-10">
+                                                    <RefreshCw className="w-6 h-6 animate-spin mx-auto text-indigo-500" />
+                                                </td>
+                                            </tr>
+                                        ) : stocks.length === 0 ? (
+                                            <tr>
+                                                <td colSpan="4" className="text-center py-10 text-slate-500">
+                                                    Belum ada data stok produk jadi.
+                                                </td>
+                                            </tr>
+                                        ) : (
+                                            stocks.map((stock) => (
+                                                <MappingRow 
+                                                    key={stock.id} 
+                                                    stock={stock} 
+                                                    onSave={handleSaveMapping}
+                                                    saving={savingMapId === stock.id}
+                                                />
+                                            ))
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </CardContent>
+                    </Card>
                 </TabsContent>
 
                 {/* Shopee Content */}
@@ -287,6 +396,63 @@ function MarketplaceIntegration() {
                 </TabsContent>
             </Tabs>
         </div>
+    );
+}
+
+function MappingRow({ stock, onSave, saving }) {
+    const [tiktokId, setTiktokId] = useState(stock.tiktok_product_id || '');
+
+    return (
+        <tr className="hover:bg-slate-800/30 transition-colors">
+            <td className="px-4 py-4">
+                <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-slate-800 overflow-hidden shrink-0">
+                        {stock.photo_url ? (
+                            <img src={stock.photo_url} alt={stock.name} className="w-full h-full object-cover" />
+                        ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                                <Box className="w-5 h-5 text-slate-600" />
+                            </div>
+                        )}
+                    </div>
+                    <div>
+                        <p className="font-bold text-slate-200">{stock.name}</p>
+                        <p className="text-[10px] text-slate-500">{stock.brand}</p>
+                    </div>
+                </div>
+            </td>
+            <td className="px-4 py-4">
+                <Badge variant="outline" className="bg-indigo-500/10 text-indigo-400 border-indigo-500/20">
+                    {stock.quantity} botol
+                </Badge>
+            </td>
+            <td className="px-4 py-4">
+                <Input 
+                    placeholder="Contoh: 1729384950" 
+                    value={tiktokId}
+                    onChange={(e) => setTiktokId(e.target.value)}
+                    className="bg-slate-950/30 border-slate-800 text-xs h-9 w-48"
+                />
+            </td>
+            <td className="px-4 py-4 text-right">
+                <Button 
+                    size="sm" 
+                    variant={stock.tiktok_product_id === tiktokId ? "ghost" : "default"}
+                    disabled={saving || !tiktokId || stock.tiktok_product_id === tiktokId}
+                    onClick={() => onSave(stock.id, tiktokId)}
+                    className="h-8 text-[10px]"
+                >
+                    {saving ? (
+                        <RefreshCw className="w-3 h-3 animate-spin" />
+                    ) : (
+                        <>
+                            <Save className="w-3 h-3 mr-1" />
+                            Simpan
+                        </>
+                    )}
+                </Button>
+            </td>
+        </tr>
     );
 }
 
