@@ -34,6 +34,13 @@ function StockDashboard() {
   // Full Image View State
   const [viewingPhoto, setViewingPhoto] = useState(null);
 
+  // Transaction State
+  const [isTransOpen, setIsTransOpen] = useState(false);
+  const [transItem, setTransItem] = useState(null);
+  const [transType, setTransType] = useState('sold'); // 'sold' | 'promo'
+  const [transQty, setTransQty] = useState('1');
+  const [isTransmitting, setIsTransmitting] = useState(false);
+
   useEffect(() => {
     if (ownerId) {
       fetchItems();
@@ -87,6 +94,56 @@ function StockDashboard() {
       fetchItems();
     } catch (error) {
       toast({ title: "Gagal", description: error.message, variant: "destructive" });
+    }
+  };
+
+  const openTransaction = (item) => {
+    setTransItem(item);
+    setTransType('sold');
+    setTransQty('1');
+    setIsTransOpen(true);
+  };
+
+  const handleTransaction = async () => {
+    if (!transItem || !transQty) return;
+    const qty = parseInt(transQty);
+    if (isNaN(qty) || qty <= 0) {
+        toast({ title: "Error", description: "Jumlah tidak valid", variant: "destructive" });
+        return;
+    }
+    if (qty > transItem.quantity) {
+        toast({ title: "Stok Kurang", description: `Sisa stok hanya ${transItem.quantity} pcs.`, variant: "destructive" });
+        return;
+    }
+
+    setIsTransmitting(true);
+    try {
+        // We update quantity and specific counter.
+        // We try updating directly. If columns don't exist, this might fail, 
+        // but we assume the system will have them or we'll add them.
+        const updateData = {
+            quantity: transItem.quantity - qty,
+            [transType === 'sold' ? 'total_sold' : 'total_promo']: (transItem[transType === 'sold' ? 'total_sold' : 'total_promo'] || 0) + qty
+        };
+
+        const { error } = await supabase
+            .from('stocks')
+            .update(updateData)
+            .eq('id', transItem.id);
+
+        if (error) throw error;
+
+        toast({ 
+            title: "Berhasil Dicatat", 
+            description: `${qty} botol ${transItem.name} dicatat sebagai ${transType === 'sold' ? 'Terjual' : 'Promosi'}.` 
+        });
+        setIsTransOpen(false);
+        fetchItems();
+    } catch (error) {
+        console.error("Trans error:", error);
+        toast({ title: "Gagal", description: "Gagal mencatat transaksi. Pastikan kolom database tersedia.", variant: "destructive" });
+    } finally {
+        setIsTransmitting(false);
     }
   };
 
@@ -345,6 +402,18 @@ function StockDashboard() {
                   </div>
                 </div>
 
+                {/* Sell/Promo Stats */}
+                <div className="grid grid-cols-2 gap-2 p-2 bg-slate-950/30 rounded-lg border border-slate-700/30">
+                  <div className="flex flex-col">
+                    <span className="text-[9px] text-slate-500 uppercase font-bold tracking-tight">Terjual</span>
+                    <span className="text-xs font-black text-emerald-400">{(item.total_sold || 0).toLocaleString()} <span className="text-[9px] font-normal text-slate-500">pcs</span></span>
+                  </div>
+                  <div className="flex flex-col border-l border-slate-700/50 pl-2">
+                    <span className="text-[9px] text-slate-500 uppercase font-bold tracking-tight">Promo/Endorse</span>
+                    <span className="text-xs font-black text-purple-400">{(item.total_promo || 0).toLocaleString()} <span className="text-[9px] font-normal text-slate-500">pcs</span></span>
+                  </div>
+                </div>
+
                 <div className="flex items-center justify-between pt-2 border-t border-slate-700/30">
                   {isSoldOut ? (
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-red-500/10 text-red-500 border border-red-500/20">
@@ -362,17 +431,24 @@ function StockDashboard() {
                       Tersedia
                     </span>
                   )}
-                  <div className="flex items-center gap-1">
+                   <div className="flex items-center gap-1">
+                    <button 
+                      onClick={() => openTransaction(item)}
+                      className="p-1.5 rounded-lg bg-indigo-600/10 hover:bg-indigo-600 text-indigo-400 hover:text-white transition-all border border-indigo-600/20"
+                      title="Catat Terjual/Promo"
+                    >
+                      <ShoppingBag className="w-3.5 h-3.5" />
+                    </button>
                     <button 
                       onClick={() => openEditPrice(item)}
-                      className="p-1.5 rounded-lg hover:bg-indigo-500/20 text-slate-400 hover:text-indigo-400 transition-colors"
+                      className="p-1.5 rounded-lg hover:bg-slate-700 transition-colors text-slate-400"
                       title="Edit Harga"
                     >
                       <Edit2 className="w-3.5 h-3.5" />
                     </button>
                     <button 
                       onClick={() => handleDeleteStock(item.id, item.name)}
-                      className="p-1.5 rounded-lg hover:bg-red-500/20 text-slate-400 hover:text-red-400 transition-colors"
+                      className="p-1.5 rounded-lg hover:bg-red-500/10 text-slate-500 hover:text-red-400 transition-colors"
                       title="Hapus"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
@@ -505,8 +581,76 @@ function StockDashboard() {
             <Button onClick={handleSavePhoto} disabled={uploadingPhoto} className="bg-indigo-600 hover:bg-indigo-700">
               {uploadingPhoto ? 'Menyimpan...' : 'Simpan Foto'}
             </Button>
-          </DialogFooter>
-        </DialogContent>
+           </DialogFooter>
+         </DialogContent>
+      </Dialog>
+
+      {/* Manual Transaction Dialog */}
+      <Dialog open={isTransOpen} onOpenChange={setIsTransOpen}>
+         <DialogContent className="bg-[#1e293b] text-slate-100 border-slate-700">
+             <DialogHeader>
+                 <DialogTitle className="flex items-center gap-2">
+                    <ShoppingBag className="w-5 h-5 text-indigo-400" />
+                    Kelola Transaksi Stok
+                 </DialogTitle>
+             </DialogHeader>
+             <div className="space-y-6 py-4">
+                 <div className="space-y-4">
+                    <div className="flex flex-col p-3 bg-slate-900/50 rounded-lg border border-slate-800">
+                        <span className="text-[10px] text-slate-500 uppercase font-bold">Produk</span>
+                        <span className="text-white font-bold">{transItem?.name}</span>
+                        <div className="flex gap-4 mt-2">
+                            <div className="flex flex-col">
+                                <span className="text-[9px] text-slate-500">Sisa Stok</span>
+                                <span className="text-sm font-bold text-slate-200">{transItem?.quantity} pcs</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label className="text-xs text-slate-400">Jenis Transaksi</Label>
+                        <div className="grid grid-cols-2 gap-2 p-1 bg-slate-900 rounded-lg border border-slate-800">
+                            <button 
+                                onClick={() => setTransType('sold')}
+                                className={`py-2 text-xs font-bold rounded-md transition-all ${transType === 'sold' ? 'bg-emerald-600 text-white' : 'text-slate-500 hover:text-slate-300'}`}
+                            >
+                                Penjualan / Laku
+                            </button>
+                            <button 
+                                onClick={() => setTransType('promo')}
+                                className={`py-2 text-xs font-bold rounded-md transition-all ${transType === 'promo' ? 'bg-purple-600 text-white' : 'text-slate-500 hover:text-slate-300'}`}
+                            >
+                                Promosi / Endorse
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label className="text-xs text-slate-400">Jumlah {transType === 'sold' ? 'Terjual' : 'Promo'} (pcs)</Label>
+                        <Input 
+                            type="number" 
+                            className="bg-slate-800 border-slate-700 h-11 text-lg font-bold"
+                            value={transQty}
+                            max={transItem?.quantity}
+                            onChange={(e) => setTransQty(e.target.value)}
+                        />
+                        <p className="text-[10px] text-slate-500 italic">
+                            * Stok akan otomatis berkurang sebanyak jumlah di atas.
+                        </p>
+                    </div>
+                 </div>
+             </div>
+             <DialogFooter className="gap-2 sm:gap-0">
+                 <Button variant="ghost" onClick={() => setIsTransOpen(false)} disabled={isTransmitting}>Batal</Button>
+                 <Button 
+                    onClick={handleTransaction} 
+                    disabled={isTransmitting || !transQty || parseInt(transQty) <= 0}
+                    className={`h-11 px-8 ${transType === 'sold' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-purple-600 hover:bg-purple-700'}`}
+                 >
+                    {isTransmitting ? 'Memproses...' : `Konfirmasi ${transType === 'sold' ? 'Penjualan' : 'Promosi'}`}
+                 </Button>
+             </DialogFooter>
+         </DialogContent>
       </Dialog>
 
       {/* Full Image View Dialog */}
