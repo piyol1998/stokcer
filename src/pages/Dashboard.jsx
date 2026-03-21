@@ -5,6 +5,7 @@ import DashboardStock from '@/components/dashboard/DashboardStock';
 import InventoryManagement from '@/components/dashboard/InventoryManagement';
 import SettingsPage from '@/components/dashboard/SettingsPage';
 import EmployeeManagement from '@/components/dashboard/inventory/EmployeeManagement';
+import MarketplaceIntegration from '@/components/dashboard/marketplace/MarketplaceIntegration';
 import AiAdvertising from '@/components/dashboard/AiAdvertising';
 import TrialBanner from '@/components/dashboard/TrialBanner';
 import PremiumLock from '@/components/dashboard/PremiumLock'; // New Lock Component
@@ -61,6 +62,8 @@ function Dashboard() {
           return <EmployeeManagement />;
         case 'ai-ads':
           return <AiAdvertising />;
+        case 'marketplace':
+          return <MarketplaceIntegration />;
         case 'settings':
           return <SettingsPage />;
         default:

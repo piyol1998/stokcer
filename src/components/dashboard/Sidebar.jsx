@@ -23,6 +23,11 @@ function Sidebar({ activeTab, setActiveTab, user, isMobileOpen, setIsMobileOpen 
     },
     { id: 'inventory', label: 'Stok & Produksi', icon: Box },
     { 
+        id: 'marketplace', 
+        label: 'Integrasi Toko', 
+        icon: ShoppingBag 
+    },
+    { 
         id: 'employees', 
         label: 'Manajemen Karyawan', 
         icon: Users,
