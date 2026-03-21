@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, Box, Settings, LogOut, Package, UserPlus as Users, Menu, X, BrainCircuit, Lock } from 'lucide-react';
+import { LayoutDashboard, Box, Settings, LogOut, Package, UserPlus as Users, Menu, X, BrainCircuit, Lock, ShoppingBag } from 'lucide-react';
 import { useAuth } from '@/contexts/SupabaseAuthContext';
 import { useSubscription } from '@/hooks/useSubscription';
 import { Button } from '@/components/ui/button';
