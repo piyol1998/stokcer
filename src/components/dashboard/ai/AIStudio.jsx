@@ -417,8 +417,8 @@ Do not use markdown inside the <RECIPE> block tags.
                 }
 
                 const modelsToTry = currentImage 
-                    ? ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-1.5-flash-latest", "gemini-1.0-pro-vision-latest", "gemini-pro-vision"]
-                    : ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-1.5-flash-8b"];
+                    ? ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-1.5-flash-latest", "gemini-1.5-pro-latest", "gemini-1.0-pro-vision-latest", "gemini-pro-vision"]
+                    : ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-pro", "gemini-1.0-pro-latest", "gemini-1.5-flash-8b"];
 
                 for (const modelName of modelsToTry) {
                     try {
