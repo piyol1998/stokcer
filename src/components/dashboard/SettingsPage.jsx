@@ -317,9 +317,9 @@ function SettingsPage() {
                                 <div className="p-3 bg-indigo-900/10 border border-indigo-500/10 rounded-lg">
                                     <h4 className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider mb-1">Cara mendapatkan Chat ID:</h4>
                                     <ol className="text-[11px] text-slate-400 list-decimal list-inside space-y-1">
-                                        <li>Buka Telegram dan cari bot: <span className="text-indigo-300 font-bold">@StokcerBot</span></li>
+                                        <li>Buka Telegram dan cari bot: <span className="text-indigo-300 font-bold">@CleithStokcerBot</span></li>
                                         <li>Tekan Tombol <span className="font-bold">START</span> atau ketik <span className="font-bold">/myid</span></li>
-                                        <li>Salin angka ID yang diberikan oleh bot</li>
+                                        <li>Bot akan otomatis membalas dengan <span className="font-bold">ID Telegram</span> Anda</li>
                                         <li>Tempel angka tersebut pada kotak di atas lalu klik <span className="font-bold">Save Changes</span></li>
                                     </ol>
                                 </div>
