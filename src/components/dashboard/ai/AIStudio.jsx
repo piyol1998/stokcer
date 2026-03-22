@@ -334,7 +334,8 @@ Do not use markdown inside the <RECIPE> block tags.
 
             if (aiProvider === 'openai') {
                 if (!openaiKey) throw new Error("API Key OpenAI tidak ditemukan. Silakan atur di menu Integrasi.");
-                const openai = new OpenAI({ apiKey: openaiKey, dangerouslyAllowBrowser: true });
+                const cleanKey = openaiKey.trim();
+                const openai = new OpenAI({ apiKey: cleanKey, dangerouslyAllowBrowser: true });
                 
                 const messagesPayload = [
                     { role: 'system', content: systemPrompt }
@@ -376,7 +377,8 @@ Do not use markdown inside the <RECIPE> block tags.
                     throw new Error("DeepSeek belum mendukung upload gambar (Vision). Silakan gunakan Gemini atau OpenAI, atau hapus gambar dan ketik pesan.");
                 }
                 
-                const openai = new OpenAI({ apiKey: deepseekKey, baseURL: 'https://api.deepseek.com', dangerouslyAllowBrowser: true });
+                const cleanKey = deepseekKey.trim();
+                const openai = new OpenAI({ apiKey: cleanKey, baseURL: 'https://api.deepseek.com', dangerouslyAllowBrowser: true });
                 
                 const messagesPayload = [
                     { role: 'system', content: systemPrompt }
@@ -404,13 +406,17 @@ Do not use markdown inside the <RECIPE> block tags.
             } else {
                 // Gemini Fallback
                 if (!apiKey) throw new Error("API Key Gemini tidak ditemukan. Silakan atur di menu Integrasi.");
-                const genAI = new GoogleGenerativeAI(apiKey);
+                
+                const cleanKey = apiKey.trim();
+                const genAI = new GoogleGenerativeAI(cleanKey);
                 
                 let result = null;
                 let lastError = null;
                 
-                let promptPayload = [systemPrompt];
-                if (currentInput) promptPayload.push(currentInput);
+                let promptPayload = [];
+                const combinedText = systemPrompt + "\n\n" + (currentInput || "Tolong analisa gambar ini.");
+                promptPayload.push(combinedText);
+
                 if (currentImage) {
                     const imagePart = await fileToGenerativePart(currentImage);
                     promptPayload.push(imagePart);
