@@ -408,18 +408,21 @@ function AIStudio({ onNavigate }) {
 
     const fetchDataContext = async () => {
         try {
-            const [ingRes, stockRes, profRes, prodRes, empRes, actRes] = await Promise.all([
+            // Fetch everything including counts for accuracy
+            const [ingRes, stockRes, profRes, prodRes, empRes, actRes, prodCountRes] = await Promise.all([
                 supabase.from('raw_materials').select('*').eq('user_id', ownerId).is('deleted_at', null).order('name', { ascending: true }),
                 supabase.from('stocks').select('*').eq('user_id', ownerId).order('name', { ascending: true }),
                 supabase.from('profiles').select('*').eq('id', ownerId).single(),
-                supabase.from('production_history').select('*').eq('user_id', ownerId).order('created_at', { ascending: false }),
+                supabase.from('production_history').select('*').eq('user_id', ownerId).order('created_at', { ascending: false }).limit(20),
                 supabase.from('employees').select('*').eq('owner_id', ownerId),
-                supabase.from('transaction_notifications').select('*').eq('user_id', ownerId).order('created_at', { ascending: false }).limit(10)
+                supabase.from('transaction_notifications').select('*').eq('user_id', ownerId).order('created_at', { ascending: false }).limit(10),
+                supabase.from('production_history').select('*', { count: 'exact', head: true }).eq('user_id', ownerId)
             ]);
 
             const materials = ingRes.data || [];
             const stocks = stockRes.data || [];
             const history = prodRes.data || [];
+            const totalBatches = prodCountRes.count || 0;
 
             // 1. Hitung Nilai Aset Bahan Baku (Sisa Modal Bahan)
             let totalStockValue = 0;
@@ -434,8 +437,9 @@ function AIStudio({ onNavigate }) {
 
             // 2. Hitung Total Biaya Produksi (Modal Terpakai)
             let totalProductionCost = 0;
+            // Kita hitung dari riwayat yang ada, tapi untuk statistik besar sebaiknya ada tabel agregat.
+            // Untuk sekarang, kita hitung dari data yang ditarik.
             history.forEach(record => {
-                // Gunakan total_cost dari record jika ada, atau hitung dari snapshot
                 if (record.total_cost) {
                     totalProductionCost += Number(record.total_cost);
                 } else if (Array.isArray(record.ingredients_snapshot)) {
@@ -451,11 +455,10 @@ function AIStudio({ onNavigate }) {
             setDbStocks(stocks);
             setDbProfile(profRes.data || null);
             setDbStats({
-                // Gunakan Math.round agar AI tidak bingung dengan angka desimal yang panjang
                 totalModalDikeluarkan: Math.round(totalProductionCost + totalStockValue),
                 sisaModalBahan: Math.round(totalStockValue),
                 totalProductionCost: Math.round(totalProductionCost),
-                totalBatches: history.length,
+                totalBatches: totalBatches, // Gunakan count hasil query head: true
                 totalProducts: stocks.length,
                 totalMaterials: materials.length,
                 recentActivity: actRes.data || [],
