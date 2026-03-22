@@ -357,6 +357,14 @@ function AIStudio({ onNavigate }) {
     const [allIngredients, setAllIngredients] = useState([]);
     const [dbStocks, setDbStocks] = useState([]);
     const [dbProfile, setDbProfile] = useState(null);
+    const [dbStats, setDbStats] = useState({
+        totalModalDikeluarkan: 0,
+        sisaModalBahan: 0,
+        totalProductionCost: 0,
+        totalBatches: 0,
+        recentActivity: [],
+        employees: []
+    });
     
     const fileInputRef = useRef(null);
     const chatEndRef = useRef(null);
@@ -400,14 +408,53 @@ function AIStudio({ onNavigate }) {
 
     const fetchDataContext = async () => {
         try {
-            const [ingRes, stockRes, profRes] = await Promise.all([
-                supabase.from('raw_materials').select('id, name, category, quantity, unit, purchase_link').eq('user_id', ownerId).is('deleted_at', null).order('name', { ascending: true }),
-                supabase.from('stocks').select('id, name, quantity, selling_price').eq('user_id', ownerId).order('name', { ascending: true }),
-                supabase.from('profiles').select('*').eq('id', ownerId).single()
+            const [ingRes, stockRes, profRes, prodRes, empRes, actRes] = await Promise.all([
+                supabase.from('raw_materials').select('*').eq('user_id', ownerId).is('deleted_at', null).order('name', { ascending: true }),
+                supabase.from('stocks').select('*').eq('user_id', ownerId).order('name', { ascending: true }),
+                supabase.from('profiles').select('*').eq('id', ownerId).single(),
+                supabase.from('production_history').select('*').eq('user_id', ownerId).order('created_at', { ascending: false }),
+                supabase.from('employees').select('*').eq('owner_id', ownerId),
+                supabase.from('transaction_notifications').select('*').eq('user_id', ownerId).order('created_at', { ascending: false }).limit(10)
             ]);
-            setAllIngredients(ingRes.data || []);
-            setDbStocks(stockRes.data || []);
+
+            const materials = ingRes.data || [];
+            const stocks = stockRes.data || [];
+            const history = prodRes.data || [];
+
+            // Calculate Dashboard-like Stats
+            let totalStockValue = 0;
+            const priceMap = {};
+            materials.forEach(m => {
+                const price = Number(m.price) || 0;
+                const amount = Number(m.price_per_qty_amount) || 1;
+                const pricePerUnit = price / amount;
+                priceMap[m.id] = pricePerUnit;
+                totalStockValue += (Number(m.quantity) || 0) * pricePerUnit;
+            });
+
+            let totalProductionCost = 0;
+            history.forEach(record => {
+                if (Array.isArray(record.ingredients_snapshot)) {
+                    record.ingredients_snapshot.forEach(ing => {
+                        const qty = Number(ing.quantity) || 0;
+                        let unitPrice = ing.pricePerUnit ? Number(ing.pricePerUnit) : (ing.materialId && priceMap[ing.materialId] ? priceMap[ing.materialId] : 0);
+                        totalProductionCost += (qty * unitPrice);
+                    });
+                }
+            });
+
+            setAllIngredients(materials);
+            setDbStocks(stocks);
             setDbProfile(profRes.data || null);
+            setDbStats({
+                totalModalDikeluarkan: totalProductionCost + totalStockValue,
+                sisaModalBahan: totalStockValue,
+                totalProductionCost: totalProductionCost,
+                totalBatches: history.length,
+                recentActivity: actRes.data || [],
+                employees: empRes.data || []
+            });
+
         } catch (error) {
             console.error("Fetch DB context error:", error);
         }
@@ -528,18 +575,33 @@ function AIStudio({ onNavigate }) {
         setProcessing(true);
 
         const systemPrompt = `
-You are Stokcer AI, the official highly advanced business AI assistant for "${dbProfile?.business_name || 'Sekali Pencet'}" (a business owned by ${dbProfile?.full_name || 'Owner'}). 
-You help the user manage their business inventory, calculate production costs, define perfume recipes, and provide strategic business analysis. 
-You MUST use a professional, highly intelligent, and friendly Indonesian language. Always identify yourself as the assistant for ${dbProfile?.business_name || 'this business'}.
+You are Stokcer AI, the official highly advanced business strategist and assistant for "${dbProfile?.business_name || 'Sekali Pencet'}" (owned by ${dbProfile?.full_name || 'Owner'}). 
+You have FULL ACCESS to the business's real-time database, including inventory, production, financial metrics, and team management.
+You MUST provide professional, strategic, and highly intelligent analysis in Indonesian.
 
-Here is the EXCLUSIVE real-time database context for ${dbProfile?.business_name || 'the user'}'s business:
+Here is the EXCLUSIVE real-time business intelligence context for ${dbProfile?.business_name || 'your company'}:
 
 <BUSINESS_PROFILE>
-- Business Name: ${dbProfile?.business_name || 'Not set'}
-- Owner Name: ${dbProfile?.full_name || 'Not set'}
+- Name: ${dbProfile?.business_name || 'Not set'}
+- Owner: ${dbProfile?.full_name || 'Not set'}
+- Contact: ${dbProfile?.phone_number || 'Not set'}
 - Address: ${dbProfile?.address || 'Not set'}
-- Phone: ${dbProfile?.phone_number || 'Not set'}
 </BUSINESS_PROFILE>
+
+<FINANCIAL_METRICS_DASHBOARD>
+- Total Investasi (Modal Dikeluarkan): Rp ${dbStats.totalModalDikeluarkan.toLocaleString()}
+- Aset Saat Ini (Sisa Modal Bahan Baku): Rp ${dbStats.sisaModalBahan.toLocaleString()}
+- Total Modal Produksi (Terpakai): Rp ${dbStats.totalProductionCost.toLocaleString()}
+- Total Batch Produksi: ${dbStats.totalBatches} batches
+</FINANCIAL_METRICS_DASHBOARD>
+
+<TEAM_MANAGEMENT>
+${dbStats.employees.length > 0 ? dbStats.employees.map(e => `- ${e.name}: ${e.role} (Status: ${e.status || 'Aktif'})`).join('\n') : "Belum ada karyawan terdaftar."}
+</TEAM_MANAGEMENT>
+
+<RECENT_ACTIVITY_LOG>
+${dbStats.recentActivity.length > 0 ? dbStats.recentActivity.map(a => `- [${new Date(a.created_at).toLocaleDateString()}] ${a.title}: ${a.message}`).join('\n') : "Belum ada aktivitas tercatat."}
+</RECENT_ACTIVITY_LOG>
 
 <DATA_PRODUK_JADI>
 ${dbStocks.length > 0 ? dbStocks.map(s => `- ${s.name}: ${s.quantity} botol (Harga Jual: Rp ${s.selling_price?.toLocaleString() || 0})`).join('\n') : "Belum ada produk jadi yang terdaftar."}
@@ -548,6 +610,14 @@ ${dbStocks.length > 0 ? dbStocks.map(s => `- ${s.name}: ${s.quantity} botol (Har
 <DATA_BAHAN_BAKU>
 ${allIngredients.length > 0 ? allIngredients.map(i => `- ${i.name} [${i.category}]: ${i.quantity || 0} ${i.unit || 'ml'}`).join('\n') : "Belum ada bahan baku yang terdaftar."}
 </DATA_BAHAN_BAKU>
+
+STRATEGIC INSTRUCTIONS:
+- You are a business growth expert. Use the metrics above to give advice if asked.
+- If the user asks about "aktivitas terbaru", "siapa saja karyawan", or "berapa total investasi", answer accurately using the tags above.
+- If the user provides a formulation (recipe), extract it into <RECIPE> JSON.
+- If the user wants to add/check materials, extract into <INVENTORY> JSON.
+- If the user mentions TikTok Shop or Shopee integrations, acknowledge that you can see their marketplace settings (if any) and are ready to assist with multi-channel stock sync.
+- Always be helpful and forward-thinking.
 
 ATURAN PENTING (CRITICAL):
 - Jika pengguna bertanya tentang data stok, produk, atau bahan baku, gunakan data di atas untuk menjawab dengan akurat.
