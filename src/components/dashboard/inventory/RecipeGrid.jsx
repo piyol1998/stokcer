@@ -156,7 +156,7 @@ const RecipeCompositionView = ({ ingredients, allRecipes, allMaterials, totalQty
 };
 
 // --- Custom Searchable Select Component ---
-const SearchableSelect = ({ options, value, onChange, placeholder = "Pilih...", className = "" }) => {
+const SearchableSelect = ({ options, value, onChange, placeholder = "Pilih...", className = "", fallbackLabel = "" }) => {
     const [open, setOpen] = useState(false);
     const [search, setSearch] = useState("");
     const wrapperRef = React.useRef(null);
@@ -172,6 +172,8 @@ const SearchableSelect = ({ options, value, onChange, placeholder = "Pilih...", 
     }, []);
 
     const selectedOption = options.find(opt => String(opt.value) === String(value));
+    // Display name: use matched option label, or fallbackLabel for items not in filtered options
+    const displayLabel = selectedOption?.label || (value && fallbackLabel) || null;
     const filteredOptions = options.filter(opt => opt.label.toLowerCase().includes(search.toLowerCase()));
 
     return (
@@ -183,8 +185,8 @@ const SearchableSelect = ({ options, value, onChange, placeholder = "Pilih...", 
             >
                 <div className="flex items-center flex-1 min-w-0 pr-2">
                     <Search className="w-3.5 h-3.5 text-indigo-400/70 mr-2 shrink-0 group-hover:text-indigo-400 transition-colors" />
-                    <span className={`truncate text-xs ${selectedOption ? 'text-slate-200' : 'text-slate-500'}`}>
-                        {selectedOption ? selectedOption.label : placeholder}
+                    <span className={`truncate text-xs ${displayLabel ? 'text-slate-200' : 'text-slate-500'}`}>
+                        {displayLabel || placeholder}
                     </span>
                 </div>
                 <ChevronsUpDown className="w-3 h-3 text-slate-500 opacity-50 shrink-0" />
@@ -1295,12 +1297,18 @@ function RecipeGrid({ onUpdate }) {
                                                             <div key={idx} className="flex gap-2 items-center bg-slate-900/50 p-2 rounded-lg border border-slate-700/50 shadow-inner">
                                                                 <SearchableSelect
                                                                     options={rawMaterials
-                                                                        .filter(m => !m.deleted_at && m.category?.toUpperCase() === sec.name?.toUpperCase())
+                                                                        .filter(m => !m.deleted_at)
+                                                                        .sort((a, b) => {
+                                                                            const aMatch = a.category?.toUpperCase() === sec.name?.toUpperCase() ? 0 : 1;
+                                                                            const bMatch = b.category?.toUpperCase() === sec.name?.toUpperCase() ? 0 : 1;
+                                                                            return aMatch - bMatch || a.name.localeCompare(b.name);
+                                                                        })
                                                                         .map(m => ({ value: m.id, label: m.name }))
                                                                     }
                                                                     value={mat.id}
                                                                     onChange={val => handleBibitSectionMaterialChange(sec.id, idx, 'id', val)}
                                                                     placeholder="Ketik untuk mencari..."
+                                                                    fallbackLabel={rawMaterials.find(m => m.id === mat.id)?.name || ''}
                                                                 />
                                                                 <div className="w-20 shrink-0 relative">
                                                                     <Input
@@ -1324,13 +1332,19 @@ function RecipeGrid({ onUpdate }) {
                                                     <div className="flex-1">
                                                         <SearchableSelect
                                                             options={rawMaterials
-                                                                .filter(m => !m.deleted_at && m.category?.toUpperCase() === sec.name?.toUpperCase())
+                                                                .filter(m => !m.deleted_at)
+                                                                .sort((a, b) => {
+                                                                    const aMatch = a.category?.toUpperCase() === sec.name?.toUpperCase() ? 0 : 1;
+                                                                    const bMatch = b.category?.toUpperCase() === sec.name?.toUpperCase() ? 0 : 1;
+                                                                    return aMatch - bMatch || a.name.localeCompare(b.name);
+                                                                })
                                                                 .map(m => ({ value: m.id, label: m.name }))
                                                             }
                                                             value={sec.materialId}
                                                             onChange={val => handleSectionChange(sec.id, 'materialId', val)}
                                                             placeholder="Ketik untuk mencari bahan utama..."
                                                             className="h-10 rounded-lg border border-slate-700 bg-slate-900 flex items-center px-1"
+                                                            fallbackLabel={rawMaterials.find(m => m.id === sec.materialId)?.name || ''}
                                                         />
                                                     </div>
                                                     <div className="hidden sm:flex flex-col text-[10px] text-slate-500 space-y-0.5">
