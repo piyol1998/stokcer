@@ -121,7 +121,19 @@ const RecipeBlock = ({ data, allIngredients, onAddIngredient, onNavigate }) => {
                             size="sm" 
                             className="bg-indigo-600 hover:bg-indigo-700 h-8 text-xs text-slate-100"
                             onClick={() => {
-                                sessionStorage.setItem('pendingAiRecipe', JSON.stringify(data));
+                                // Enrich data with current matches from DB
+                                const enrichedData = {
+                                    ...data,
+                                    components: data.components.map(comp => {
+                                        const match = allIngredients.find(i => i.name.toLowerCase().trim() === comp.name.toLowerCase().trim());
+                                        return {
+                                            ...comp,
+                                            matchedId: match?.id,
+                                            matchedCategory: match?.category
+                                        };
+                                    })
+                                };
+                                sessionStorage.setItem('pendingAiRecipe', JSON.stringify(enrichedData));
                                 if (onNavigate) onNavigate('recipes');
                             }}
                         >

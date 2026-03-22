@@ -310,49 +310,50 @@ function RecipeGrid({ onUpdate }) {
                         const matchedComponents = (aiData.components || []).map(comp => {
                             const aiName = (comp.name || '').toLowerCase().trim();
                             
-                            // Smart match: check exact, then check if one contains the other (ignoring text in parentheses)
-                            const match = (fetchedMaterials || []).find(m => {
-                                const dbName = m.name.toLowerCase().trim();
-                                // Clean AI name from parentheses like "Lemon boost (citral)" -> "lemon boost"
-                                const aiNameClean = aiName.replace(/\s*\(.*\)\s*/g, '').trim();
-                                
-                                return dbName === aiName || 
-                                       dbName === aiNameClean || 
-                                       aiName.includes(dbName) || 
-                                       dbName.includes(aiNameClean);
-                            });
+                            // Check if AI Studio already matched it
+                            let match = null;
+                            if (comp.matchedId && comp.matchedCategory) {
+                                match = (fetchedMaterials || []).find(m => m.id === comp.matchedId);
+                            }
+                            
+                            // Fallback to Smart match if not already matched
+                            if (!match) {
+                                match = (fetchedMaterials || []).find(m => {
+                                    const dbName = m.name.toLowerCase().trim();
+                                    const aiNameClean = aiName.replace(/\s*\(.*\)\s*/g, '').trim();
+                                    return dbName === aiName || dbName === aiNameClean || aiName.includes(dbName) || dbName.includes(aiNameClean);
+                                });
+                            }
                             return { comp, match };
                         });
 
                         // Find the most common category among matched materials
                         const categoryCounts = {};
-                        matchedComponents.forEach(({ match }) => {
-                            if (match?.category) {
-                                const key = match.category.toUpperCase().trim();
+                        matchedComponents.forEach(({ comp, match }) => {
+                            // Prefer AI-provided matchedCategory
+                            const category = match?.category || comp.matchedCategory;
+                            if (category) {
+                                const key = category.toUpperCase().trim();
                                 categoryCounts[key] = (categoryCounts[key] || 0) + 1;
                             }
                         });
-                        // Dominant category = the one with most materials; fallback to 'Material sintetik'
-                        const dominantCategoryKey = Object.entries(categoryCounts)
-                            .sort((a, b) => b[1] - a[1])[0]?.[0] || 'MATERIAL SINTETIK';
-                        // Find the original-case display name for the dominant category
-                        const dominantDisplayName = matchedComponents.find(({ match }) => 
-                            match?.category?.toUpperCase().trim() === dominantCategoryKey
-                        )?.match?.category || 'Material sintetik';
+                        // Dominant category fallback
+                        const dominantCategoryKey = Object.entries(categoryCounts).sort((a,b)=>b[1]-a[1])[0]?.[0] || 'MATERIAL SINTETIK';
+                        const dominantDisplayName = matchedComponents.find(({ comp, match }) => (match?.category || comp.matchedCategory)?.toUpperCase().trim() === dominantCategoryKey)?.match?.category || 'Material sintetik';
 
-                        // Pass 2: Group components using dominant category as default for unmatched
-                        const categoryGroups = {};       // key = UPPERCASE category, value = array of materials
-                        const categoryDisplayNames = {};  // key = UPPERCASE category, value = display name
+                        // Pass 2: Group components
+                        const categoryGroups = {};
+                        const categoryDisplayNames = {};
                         matchedComponents.forEach(({ comp, match }) => {
-                            // Use matched category, or dominant category for unmatched materials
-                            const rawCategory = match?.category || dominantDisplayName;
+                            // Use matched category from DB, or matchedCategory from AI, or dominant as fallback
+                            const rawCategory = match?.category || comp.matchedCategory || dominantDisplayName;
                             const categoryKey = rawCategory.toUpperCase().trim();
                             if (!categoryGroups[categoryKey]) {
                                 categoryGroups[categoryKey] = [];
                                 categoryDisplayNames[categoryKey] = rawCategory;
                             }
                             categoryGroups[categoryKey].push({
-                                id: match ? match.id : '',
+                                id: match ? match.id : (comp.matchedId || ''),
                                 percent_share: comp.percentage || 0,
                                 _name: comp.name
                             });
