@@ -9,6 +9,7 @@ import MarketplaceIntegration from '@/components/dashboard/marketplace/Marketpla
 import AiAdvertising from '@/components/dashboard/AiAdvertising';
 import TrialBanner from '@/components/dashboard/TrialBanner';
 import PremiumLock from '@/components/dashboard/PremiumLock'; // New Lock Component
+import AIStudio from '@/components/dashboard/ai/AIStudio';
 import { useAuth } from '@/contexts/SupabaseAuthContext';
 import { useSubscription } from '@/hooks/useSubscription';
 import { Menu, Package, Loader2 } from 'lucide-react';
@@ -62,6 +63,8 @@ function Dashboard() {
           return <EmployeeManagement />;
         case 'ai-ads':
           return <AiAdvertising />;
+        case 'ai-studio':
+          return <AIStudio />;
         case 'marketplace':
           return <MarketplaceIntegration />;
         case 'settings':

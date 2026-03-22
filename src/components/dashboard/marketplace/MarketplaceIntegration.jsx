@@ -11,12 +11,11 @@ import {
     Settings2, 
     CheckCircle2, 
     AlertCircle, 
-    ExternalLink,
-    Lock,
-    Key,
     ShieldCheck,
     Box,
-    Save
+    Save,
+    Cpu,
+    Wifi
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -47,6 +46,18 @@ function MarketplaceIntegration() {
         partnerKey: '',
         shopId: '',
         status: 'disconnected'
+    });
+
+    const [wooCreds, setWooCreds] = useState({
+        url: '',
+        consumerKey: '',
+        consumerSecret: '',
+        status: 'disconnected'
+    });
+
+    const [aiCreds, setAiCreds] = useState({
+        gemini_api_key: '',
+        status: 'active'
     });
 
     useEffect(() => {
@@ -85,6 +96,8 @@ function MarketplaceIntegration() {
                 const creds = data.marketplace_creds;
                 if (creds.tiktok) setTiktokCreds(prev => ({ ...prev, ...creds.tiktok }));
                 if (creds.shopee) setShopeeCreds(prev => ({ ...prev, ...creds.shopee }));
+                if (creds.woocommerce) setWooCreds(prev => ({ ...prev, ...creds.woocommerce }));
+                if (creds.ai) setAiCreds(prev => ({ ...prev, ...creds.ai }));
             }
         } catch (error) {
             console.error("Fetch settings error:", error);
@@ -129,6 +142,61 @@ function MarketplaceIntegration() {
             setTiktokCreds(prev => ({ ...prev, status: newCreds.tiktok.status }));
         } catch (error) {
             toast({ title: "Gagal Menyimpan", description: error.message, variant: "destructive" });
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const handleSaveAi = async () => {
+        setSaving(true);
+        try {
+            const { data: currentData } = await supabase
+                .from('user_settings')
+                .select('marketplace_creds')
+                .eq('user_id', ownerId)
+                .single();
+
+            const newCreds = {
+                ...(currentData?.marketplace_creds || {}),
+                ai: aiCreds
+            };
+
+            const { error } = await supabase
+                .from('user_settings')
+                .upsert({ user_id: ownerId, marketplace_creds: newCreds, updated_at: new Date().toISOString() });
+
+            if (error) throw error;
+            toast({ title: "Berhasil", description: "API Key Gemini telah disimpan." });
+        } catch (error) {
+            toast({ title: "Gagal", description: error.message, variant: "destructive" });
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const handleSaveWoo = async () => {
+        setSaving(true);
+        try {
+            const { data: currentData } = await supabase
+                .from('user_settings')
+                .select('marketplace_creds')
+                .eq('user_id', ownerId)
+                .single();
+
+            const newCreds = {
+                ...(currentData?.marketplace_creds || {}),
+                woocommerce: { ...wooCreds, status: 'connected' }
+            };
+
+            const { error } = await supabase
+                .from('user_settings')
+                .upsert({ user_id: ownerId, marketplace_creds: newCreds, updated_at: new Date().toISOString() });
+
+            if (error) throw error;
+            toast({ title: "Berhasil", description: "Koneksi WooCommerce telah disimpan." });
+            setWooCreds(prev => ({ ...prev, status: 'connected' }));
+        } catch (error) {
+            toast({ title: "Gagal", description: error.message, variant: "destructive" });
         } finally {
             setSaving(false);
         }
@@ -188,9 +256,17 @@ function MarketplaceIntegration() {
                         <Globe className="w-4 h-4" />
                         Shopee
                     </TabsTrigger>
+                    <TabsTrigger value="woocommerce" className="gap-2 px-6">
+                        <ShoppingBag className="w-4 h-4" />
+                        WooCommerce
+                    </TabsTrigger>
                     <TabsTrigger value="mapping" className="gap-2 px-6">
                         <Box className="w-4 h-4" />
                         Mapping Produk
+                    </TabsTrigger>
+                    <TabsTrigger value="ai" className="gap-2 px-6">
+                        <Cpu className="w-4 h-4" />
+                        AI & Otomasi
                     </TabsTrigger>
                 </TabsList>
 
@@ -377,6 +453,93 @@ function MarketplaceIntegration() {
                                 </table>
                             </div>
                         </CardContent>
+                    </Card>
+                </TabsContent>
+
+                {/* WooCommerce Content */}
+                <TabsContent value="woocommerce">
+                    <Card className="bg-slate-900/50 border-slate-800">
+                        <CardHeader>
+                            <CardTitle>WooCommerce Integration</CardTitle>
+                            <CardDescription>Hubungkan inventaris dengan website WordPress Anda.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="space-y-2">
+                                <Label>Website URL</Label>
+                                <Input 
+                                    placeholder="https://cleith.com" 
+                                    className="bg-slate-950 border-slate-800"
+                                    value={wooCreds.url}
+                                    onChange={e => setWooCreds({...wooCreds, url: e.target.value})}
+                                />
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label>Consumer Key</Label>
+                                    <Input 
+                                        placeholder="ck_..." 
+                                        className="bg-slate-950 border-slate-800"
+                                        value={wooCreds.consumerKey}
+                                        onChange={e => setWooCreds({...wooCreds, consumerKey: e.target.value})}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>Consumer Secret</Label>
+                                    <Input 
+                                        type="password"
+                                        placeholder="cs_..." 
+                                        className="bg-slate-950 border-slate-800"
+                                        value={wooCreds.consumerSecret}
+                                        onChange={e => setWooCreds({...wooCreds, consumerSecret: e.target.value})}
+                                    />
+                                </div>
+                            </div>
+                        </CardContent>
+                        <CardFooter className="border-t border-slate-800 flex justify-between items-center py-4">
+                            <Badge variant={wooCreds.status === 'connected' ? 'success' : 'outline'}>
+                                {wooCreds.status.toUpperCase()}
+                            </Badge>
+                            <Button onClick={handleSaveWoo} disabled={saving}>
+                                {saving ? <RefreshCw className="animate-spin w-4 h-4 mr-2" /> : <Save className="w-4 h-4 mr-2" />}
+                                Save Connection
+                            </Button>
+                        </CardFooter>
+                    </Card>
+                </TabsContent>
+
+                {/* AI & Automation Content */}
+                <TabsContent value="ai">
+                    <Card className="bg-slate-900/50 border-slate-800">
+                        <CardHeader>
+                            <div className="flex items-center gap-3">
+                                <Cpu className="w-10 h-10 text-indigo-500" />
+                                <div>
+                                    <CardTitle>Gemini AI Configuration</CardTitle>
+                                    <CardDescription>Atur "Otak" buatan untuk sistem stok parfum Cleith.</CardDescription>
+                                </div>
+                            </div>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="p-4 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-xs text-indigo-300 leading-relaxed">
+                                AI Gemini akan digunakan di menu <strong>AI Studio</strong> untuk memproses foto resep formulasi, melakukan pengecekan bahan baku otomatis, dan memberikan prediksi stok di masa depan.
+                            </div>
+                            <div className="space-y-2">
+                                <Label className="text-slate-300">Gemini API Key</Label>
+                                <Input 
+                                    type="password"
+                                    placeholder="AIzaSy..." 
+                                    className="bg-slate-950 border-slate-800 focus:ring-indigo-500"
+                                    value={aiCreds.gemini_api_key}
+                                    onChange={e => setAiCreds({...aiCreds, gemini_api_key: e.target.value})}
+                                />
+                            </div>
+                        </CardContent>
+                        <CardFooter className="border-t border-slate-800 py-4 flex justify-end">
+                            <Button onClick={handleSaveAi} disabled={saving} className="bg-indigo-600 hover:bg-indigo-700">
+                                {saving ? <RefreshCw className="animate-spin w-4 h-4 mr-2" /> : <Save className="w-4 h-4 mr-2" />}
+                                Simpan API Key
+                            </Button>
+                        </CardFooter>
                     </Card>
                 </TabsContent>
 

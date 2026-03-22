@@ -28,6 +28,12 @@ function Sidebar({ activeTab, setActiveTab, user, isMobileOpen, setIsMobileOpen 
         icon: ShoppingBag 
     },
     { 
+        id: 'ai-studio', 
+        label: 'AI Studio Cleith', 
+        icon: BrainCircuit,
+        className: "bg-indigo-500/10 text-indigo-400 border border-indigo-500/20"
+    },
+    { 
         id: 'employees', 
         label: 'Manajemen Karyawan', 
         icon: Users,
@@ -75,7 +81,7 @@ function Sidebar({ activeTab, setActiveTab, user, isMobileOpen, setIsMobileOpen 
                 isActive 
                   ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/20' 
                   : 'text-slate-400 hover:bg-slate-800/50 hover:text-white'
-              }`}
+              } ${item.className || ''}`}
             >
               <div className="relative">
                   <Icon className={`w-5 h-5 ${isActive ? 'text-white' : 'text-slate-500 group-hover:text-white'}`} />
