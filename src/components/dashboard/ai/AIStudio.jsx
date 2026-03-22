@@ -315,8 +315,7 @@ function AIStudio({ onNavigate }) {
     // Content States
     const [messages, setMessages] = useState([]);
     const [inputText, setInputText] = useState('');
-    const [image, setImage] = useState(null);
-    const [imagePreview, setImagePreview] = useState(null);
+    const [images, setImages] = useState([]); // Array of { file, preview }
     
     const [allIngredients, setAllIngredients] = useState([]);
     const [dbStocks, setDbStocks] = useState([]);
@@ -374,23 +373,42 @@ function AIStudio({ onNavigate }) {
         }
     };
 
-    const handleImageChange = (e) => {
-        const file = e.target.files[0];
-        if (file) {
-            setImage(file);
+    const addFiles = (files) => {
+        const validFiles = files.filter(f => f && f.type.startsWith('image/'));
+        if (!validFiles.length) return;
+        
+        validFiles.forEach(file => {
             const reader = new FileReader();
             reader.onloadend = () => {
-                setImagePreview(reader.result);
+                setImages(prev => [...prev, { file, preview: reader.result }]);
             };
             reader.readAsDataURL(file);
+        });
+    };
+
+    const handleImageChange = (e) => {
+        const files = Array.from(e.target.files || []);
+        addFiles(files);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+    };
+
+    const handlePaste = (e) => {
+        const items = Array.from(e.clipboardData.items || []);
+        const files = [];
+        for (const item of items) {
+            if (item.type.indexOf("image") !== -1) {
+                files.push(item.getAsFile());
+            }
+        }
+        if (files.length > 0) {
+            e.preventDefault();
+            addFiles(files);
         }
     };
 
-    const removeImage = () => {
-        setImage(null);
-        setImagePreview(null);
-        if (fileInputRef.current) fileInputRef.current.value = '';
-    }
+    const removeImage = (index) => {
+        setImages(prev => prev.filter((_, i) => i !== index));
+    };
 
     const fileToBase64 = (file) => new Promise((resolve) => {
         const reader = new FileReader();
@@ -452,21 +470,21 @@ function AIStudio({ onNavigate }) {
     const handleSubmit = async (e) => {
         e?.preventDefault();
         
-        if (!inputText.trim() && !image) return;
+        if (!inputText.trim() && images.length === 0) return;
+
+        const currentImages = [...images];
+        const currentInput = inputText;
 
         const userMsg = {
             id: Date.now().toString(),
             role: 'user',
             content: inputText,
-            imageUrl: imagePreview
+            images: currentImages.map(img => img.preview)
         };
-
-        const currentInput = inputText;
-        const currentImage = image;
 
         setMessages(prev => [...prev, userMsg]);
         setInputText('');
-        removeImage();
+        setImages([]);
         setProcessing(true);
 
         const systemPrompt = `
@@ -506,7 +524,9 @@ IMPORTANT: Jika pengguna mengunggah gambar berupa DAFTAR INVENTARIS / DAFTAR BAH
     ]
 }
 </INVENTORY>
-Ingat: Jangan menggunakan tag <RECIPE> jika itu jelas-jelas daftar cek stok/inventaris. Gunakan <INVENTORY>.
+
+MANDATORY INSTRUCTION (SANGAT PENTING): 
+Jika Anda menyadari bahwa gambar yang diunggah adalah DAFTAR BAHAN atau CEK INVENTARIS TEKS SAJA, JANGAN PERNAH membuat daftar markdown biasa! SELALU gunakan blok <INVENTORY> XML di atas agar sistem bisa mendeteksinya. Jika Anda membuat list biasa (markdown), sistem tidak akan bisa membacanya!
 
 If there is no image and they ask a normal question, just reply nicely formatting your text in markdown.
 Do not use markdown inside the <RECIPE> or <INVENTORY> block tags.
@@ -535,12 +555,13 @@ Do not use markdown inside the <RECIPE> or <INVENTORY> block tags.
                 // Add current message
                 const currentContent = [];
                 if (currentInput) currentContent.push({ type: "text", text: currentInput });
-                if (currentImage) {
-                    const b64 = await fileToBase64(currentImage);
+                
+                for (let imgObj of currentImages) {
+                    const b64 = await fileToBase64(imgObj.file);
                     currentContent.push({ type: "image_url", image_url: { url: b64 } });
                 }
 
-                if (currentContent.length === 0) currentContent.push({ type: "text", text: "Please process this image." });
+                if (currentContent.length === 0) currentContent.push({ type: "text", text: "Please process these images." });
 
                 messagesPayload.push({
                     role: 'user',
@@ -548,7 +569,7 @@ Do not use markdown inside the <RECIPE> or <INVENTORY> block tags.
                 });
 
                 const response = await openai.chat.completions.create({
-                    model: currentImage ? "gpt-4o" : "gpt-4o-mini", // fallback to light model if just text
+                    model: currentImages.length > 0 ? "gpt-4o" : "gpt-4o-mini",
                     messages: messagesPayload
                 });
 
@@ -556,7 +577,7 @@ Do not use markdown inside the <RECIPE> or <INVENTORY> block tags.
 
             } else if (aiProvider === 'deepseek') {
                 if (!deepseekKey) throw new Error("API Key DeepSeek tidak ditemukan. Silakan atur di menu Integrasi.");
-                if (currentImage) {
+                if (currentImages.length > 0) {
                     throw new Error("DeepSeek belum mendukung upload gambar (Vision). Silakan gunakan Gemini atau OpenAI, atau hapus gambar dan ketik pesan.");
                 }
                 
@@ -597,14 +618,14 @@ Do not use markdown inside the <RECIPE> or <INVENTORY> block tags.
                         {
                             role: "user",
                             parts: [
-                                { text: systemPrompt + "\n\n" + (currentInput || "Tolong analisa ini.") }
+                                { text: systemPrompt + "\n\n" + (currentInput || "Tolong analisa gambar berikut.") }
                             ]
                         }
                     ]
                 };
 
-                if (currentImage) {
-                    const base64Data = await fileToBase64(currentImage);
+                for (let imgObj of currentImages) {
+                    const base64Data = await fileToBase64(imgObj.file);
                     const b64Parts = base64Data.split(',');
                     const mimeType = b64Parts[0].match(/:(.*?);/)[1];
                     const data = b64Parts[1];
@@ -614,7 +635,7 @@ Do not use markdown inside the <RECIPE> or <INVENTORY> block tags.
                     });
                 }
 
-                const apiModelsToTry = currentImage 
+                const apiModelsToTry = currentImages.length > 0
                     ? ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]
                     : ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-pro"];
 
@@ -748,9 +769,13 @@ Do not use markdown inside the <RECIPE> or <INVENTORY> block tags.
                             {/* Bubble */}
                             <div className={`flex flex-col gap-2 max-w-[85%] ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
                                 
-                                {msg.imageUrl && (
-                                    <div className="rounded-xl overflow-hidden border-2 border-slate-700 max-w-[250px]">
-                                        <img src={msg.imageUrl} alt="Uploaded" className="w-full h-auto object-cover" />
+                                {msg.images && msg.images.length > 0 && (
+                                    <div className="flex flex-wrap gap-2 justify-end">
+                                        {msg.images.map((imgPreview, idx) => (
+                                            <div key={idx} className="rounded-xl overflow-hidden border-2 border-slate-700 max-w-[200px] shrink-0">
+                                                <img src={imgPreview} alt="Uploaded" className="w-full h-auto object-cover" />
+                                            </div>
+                                        ))}
                                     </div>
                                 )}
 
@@ -809,15 +834,17 @@ Do not use markdown inside the <RECIPE> or <INVENTORY> block tags.
             <div className="shrink-0 max-w-4xl mx-auto w-full pb-4 px-2">
                 <form onSubmit={handleSubmit} className="relative mt-2">
                     
-                    {/* Image Preview attachment */}
-                    {imagePreview && (
-                        <div className="absolute -top-24 left-4 bg-slate-900 border border-slate-700 p-1.5 rounded-xl flex items-center shadow-xl shadow-black/50">
-                            <div className="relative w-16 h-16 rounded-lg overflow-hidden border border-slate-800">
-                                <img src={imagePreview} className="w-full h-full object-cover" alt="Preview" />
-                                <button type="button" onClick={removeImage} className="absolute top-1 right-1 w-5 h-5 bg-black/60 rounded-full flex items-center justify-center text-white hover:bg-black">
-                                    <X className="w-3 h-3" />
-                                </button>
-                            </div>
+                    {/* Image Previews attachment */}
+                    {images.length > 0 && (
+                        <div className="absolute -top-[100px] left-2 right-2 flex gap-3 overflow-x-auto pb-4 pt-2 z-10 custom-scrollbar pointer-events-auto">
+                            {images.map((imgObj, idx) => (
+                                <div key={idx} className="relative w-24 h-24 shrink-0 rounded-xl overflow-hidden border border-slate-700 bg-slate-900 shadow-xl">
+                                    <img src={imgObj.preview} className="w-full h-full object-cover" alt="Preview" />
+                                    <button type="button" onClick={() => removeImage(idx)} className="absolute top-1 right-1 w-6 h-6 bg-black/80 rounded-full flex items-center justify-center text-white hover:bg-black hover:text-red-400 transition-colors">
+                                        <X className="w-3.5 h-3.5" />
+                                    </button>
+                                </div>
+                            ))}
                         </div>
                     )}
 
@@ -829,6 +856,7 @@ Do not use markdown inside the <RECIPE> or <INVENTORY> block tags.
                             onChange={handleImageChange}
                             className="hidden" 
                             accept="image/*"
+                            multiple
                         />
                         
                         <DropdownMenu>
@@ -852,22 +880,23 @@ Do not use markdown inside the <RECIPE> or <INVENTORY> block tags.
                         <textarea 
                             value={inputText}
                             onChange={(e) => setInputText(e.target.value)}
+                            onPaste={handlePaste}
                             onKeyDown={(e) => {
                                 if (e.key === 'Enter' && !e.shiftKey) {
                                     e.preventDefault();
                                     handleSubmit(e);
                                 }
                             }}
-                            placeholder="Tanya Chat AI, atau upload resep racikan parfum di sini..."
+                            placeholder="Tanya Chat AI, paste gambar langsung (Ctrl+V), atau ketik pesan..."
                             className="flex-1 bg-transparent border-none text-slate-200 placeholder:text-slate-500 focus:ring-0 resize-none min-h-[44px] max-h-[150px] overflow-y-auto px-3 py-3 text-[15px] outline-none"
                             style={{ height: '44px', fieldSizing: "content" }}
                         />
 
                         <Button 
                             type="submit" 
-                            disabled={processing || (!inputText.trim() && !image)}
+                            disabled={processing || (!inputText.trim() && images.length === 0)}
                             size="icon" 
-                            className={`shrink-0 rounded-full w-10 h-10 mb-0.5 mr-0.5 transition-colors ${inputText.trim() || image ? 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-md' : 'bg-slate-800 text-slate-500'}`}
+                            className={`shrink-0 rounded-full w-10 h-10 mb-0.5 mr-0.5 transition-colors ${inputText.trim() || images.length > 0 ? 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-md' : 'bg-slate-800 text-slate-500'}`}
                         >
                             <ArrowUp className="w-5 h-5" />
                         </Button>
