@@ -26,7 +26,8 @@ import {
     X,
     FileText,
     ArrowUp,
-    Bot
+    Bot,
+    Trash2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -171,6 +172,133 @@ const RecipeBlock = ({ data, allIngredients, onAddIngredient, onNavigate }) => {
     );
 };
 
+const InventoryCheckBlock = ({ data, allIngredients, onAddIngredient, onDeleteIngredient }) => {
+    const [missingCategories, setMissingCategories] = useState({});
+
+    const missingItems = data.items.filter(item => {
+        const cleanName = item.name.toLowerCase().trim();
+        return !allIngredients.some(i => i.name.toLowerCase().trim() === cleanName);
+    });
+
+    const existingItems = data.items.filter(item => {
+        const cleanName = item.name.toLowerCase().trim();
+        return allIngredients.some(i => i.name.toLowerCase().trim() === cleanName);
+    });
+
+    const handleCategoryChange = (name, cat) => {
+        setMissingCategories(prev => ({...prev, [name]: cat}));
+    };
+
+    return (
+        <div className="space-y-4 my-4 w-full max-w-2xl">
+            {missingItems.length > 0 && (
+                <Card className="border-amber-500/30 bg-amber-500/5 backdrop-blur-sm overflow-hidden border-2">
+                    <div className="bg-amber-500/10 px-4 py-3 border-b border-amber-500/20 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                            <AlertTriangle className="w-5 h-5 text-amber-500" />
+                            <h3 className="text-sm font-bold text-amber-500">Perlu Tambahan {missingItems.length} Bahan Baru</h3>
+                        </div>
+                    </div>
+                    <CardContent className="p-0">
+                        <div className="divide-y divide-amber-500/10">
+                            {missingItems.map((item, idx) => (
+                                <div key={idx} className="p-3 flex flex-col md:flex-row md:items-center justify-between gap-3 bg-slate-900/50">
+                                    <div>
+                                        <p className="font-bold text-slate-200 text-sm">{item.name}</p>
+                                        {item.quantity !== undefined && (
+                                            <p className="text-xs text-slate-500">Kuantitas deteksi: {item.quantity} {item.unit}</p>
+                                        )}
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <Select 
+                                            value={missingCategories[item.name] || "Material sintetik"}
+                                            onValueChange={(val) => handleCategoryChange(item.name, val)}
+                                        >
+                                            <SelectTrigger className="w-[120px] bg-slate-950 border-slate-800 text-xs h-8">
+                                                <SelectValue placeholder="Kategori" />
+                                            </SelectTrigger>
+                                            <SelectContent className="bg-slate-950 border-slate-800 text-slate-300 border-2">
+                                                <SelectItem value="Bibit">Bibit</SelectItem>
+                                                <SelectItem value="Pelarut">Pelarut</SelectItem>
+                                                <SelectItem value="Material sintetik">Material sintetik</SelectItem>
+                                                <SelectItem value="Botol">Botol</SelectItem>
+                                                <SelectItem value="Box">Box</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                        <Button 
+                                            size="sm"
+                                            className="bg-amber-600 hover:bg-amber-700 h-8 text-xs"
+                                            onClick={() => onAddIngredient(item.name, missingCategories[item.name] || "Material sintetik")}
+                                        >
+                                            <Plus className="w-3 h-3 mr-1" />
+                                            Input
+                                        </Button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
+
+            {existingItems.length > 0 && (
+                <Card className="bg-slate-900/50 border-slate-800 shadow-xl">
+                    <CardHeader className="border-b border-slate-800 pb-3">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-lg bg-emerald-600/20 flex items-center justify-center border border-emerald-500/20">
+                                    <Database className="w-4 h-4 text-emerald-400" />
+                                </div>
+                                <div>
+                                    <CardTitle className="text-base text-slate-200">Bahan Baku Terdeteksi</CardTitle>
+                                </div>
+                            </div>
+                        </div>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-xs text-left">
+                                <thead className="bg-slate-950 text-slate-500">
+                                    <tr>
+                                        <th className="px-4 py-3 font-bold uppercase tracking-wider">Bahan Baku</th>
+                                        <th className="px-4 py-3 font-bold uppercase tracking-wider">Status Stokcer</th>
+                                        <th className="px-4 py-3 font-bold uppercase tracking-wider text-right">Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-800">
+                                    {existingItems.map((item, idx) => {
+                                        const dbItem = allIngredients.find(i => i.name.toLowerCase().trim() === item.name.toLowerCase().trim());
+                                        return (
+                                            <tr key={idx} className="hover:bg-slate-800/30 transition-colors">
+                                                <td className="px-4 py-3 font-medium text-slate-200">{dbItem?.name || item.name}</td>
+                                                <td className="px-4 py-3">
+                                                    <Badge className="bg-emerald-500/10 text-emerald-500 border-none text-[9px] h-5">
+                                                        <Check className="w-2 h-2 mr-1" /> Tersedia ({dbItem?.quantity || 0} {dbItem?.unit})
+                                                    </Badge>
+                                                </td>
+                                                <td className="px-4 py-3 text-right">
+                                                    <Button 
+                                                        variant="ghost" 
+                                                        size="sm" 
+                                                        className="h-7 text-red-500 hover:text-red-400 hover:bg-red-500/10 px-2"
+                                                        onClick={() => onDeleteIngredient(dbItem?.id, dbItem?.name)}
+                                                    >
+                                                        <Trash2 className="w-3 h-3 mr-1" /> Hapus
+                                                    </Button>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
+        </div>
+    );
+};
+
 function AIStudio({ onNavigate }) {
     const { ownerId } = useAuth();
     const { toast } = useToast();
@@ -236,7 +364,7 @@ function AIStudio({ onNavigate }) {
     const fetchIngredients = async () => {
         try {
             const [ingRes, stockRes] = await Promise.all([
-                supabase.from('raw_materials').select('name, category, quantity, unit').eq('user_id', ownerId).order('name', { ascending: true }),
+                supabase.from('raw_materials').select('id, name, category, quantity, unit').eq('user_id', ownerId).is('deleted_at', null).order('name', { ascending: true }),
                 supabase.from('stocks').select('name, quantity, status').eq('user_id', ownerId).order('name', { ascending: true })
             ]);
             setAllIngredients(ingRes.data || []);
@@ -305,6 +433,22 @@ function AIStudio({ onNavigate }) {
         }
     };
 
+    const deleteIngredient = async (id, name) => {
+        if (!window.confirm(`Yakin ingin menghapus bahan baku "${name}"?`)) return;
+        try {
+            const { error } = await supabase
+                .from('raw_materials')
+                .update({ deleted_at: new Date().toISOString() })
+                .eq('id', id);
+
+            if (error) throw error;
+            toast({ title: "Berhasil", description: `Bahan ${name} telah dihapus.` });
+            setAllIngredients(prev => prev.filter(i => i.id !== id));
+        } catch (error) {
+            toast({ title: "Gagal Menghapus", description: error.message, variant: "destructive" });
+        }
+    };
+
     const handleSubmit = async (e) => {
         e?.preventDefault();
         
@@ -351,8 +495,21 @@ IMPORTANT: When you detect a recipe or formulation, you MUST format the recipe a
     ]
 }
 </RECIPE>
+
+IMPORTANT: Jika pengguna mengunggah gambar berupa DAFTAR INVENTARIS / DAFTAR BAHAN BAKU (bukan formula persentase resep), Anda WAJIB memformatnya sebagai blok JSON terstruktur di dalam tag <INVENTORY> seperti ini:
+<INVENTORY>
+{
+    "title": "Pengecekan Stok",
+    "items": [
+        { "name": "Nama Bahan 1", "quantity": 100, "unit": "gr" },
+        { "name": "Nama Bahan 2", "quantity": 0, "unit": "ml" }
+    ]
+}
+</INVENTORY>
+Ingat: Jangan menggunakan tag <RECIPE> jika itu jelas-jelas daftar cek stok/inventaris. Gunakan <INVENTORY>.
+
 If there is no image and they ask a normal question, just reply nicely formatting your text in markdown.
-Do not use markdown inside the <RECIPE> block tags.
+Do not use markdown inside the <RECIPE> or <INVENTORY> block tags.
         `.trim();
 
         try {
@@ -501,7 +658,12 @@ Do not use markdown inside the <RECIPE> block tags.
             // Parse response for <RECIPE> tag
             const recipeRegex = /<RECIPE>([\s\S]*?)<\/RECIPE>/;
             const match = responseText.match(recipeRegex);
+            
+            const inventoryRegex = /<INVENTORY>([\s\S]*?)<\/INVENTORY>/;
+            const invMatch = responseText.match(inventoryRegex);
+
             let parsedData = null;
+            let invParsedData = null;
             let displayContent = responseText;
 
             if (match) {
@@ -511,13 +673,21 @@ Do not use markdown inside the <RECIPE> block tags.
                 } catch(e) {
                     console.error("Failed to parse recipe json", e);
                 }
+            } else if (invMatch) {
+                try {
+                    invParsedData = JSON.parse(invMatch[1].trim());
+                    displayContent = responseText.replace(inventoryRegex, '').trim();
+                } catch(e) {
+                    console.error("Failed to parse inventory json", e);
+                }
             }
 
             const assistantMsg = {
                 id: Date.now().toString(),
                 role: 'assistant',
-                content: displayContent || "Berikut adalah resep yang berhasil dideteksi.",
-                recipeData: parsedData
+                content: displayContent || "Berikut adalah hasil analisis resep atau bahan yang terdeteksi.",
+                recipeData: parsedData,
+                inventoryData: invParsedData
             };
 
             setMessages(prev => [...prev, assistantMsg]);
@@ -602,6 +772,15 @@ Do not use markdown inside the <RECIPE> block tags.
                                         allIngredients={allIngredients} 
                                         onAddIngredient={addIngredient} 
                                         onNavigate={onNavigate}
+                                    />
+                                )}
+
+                                {msg.inventoryData && (
+                                    <InventoryCheckBlock 
+                                        data={msg.inventoryData} 
+                                        allIngredients={allIngredients} 
+                                        onAddIngredient={addIngredient} 
+                                        onDeleteIngredient={deleteIngredient}
                                     />
                                 )}
                             </div>
