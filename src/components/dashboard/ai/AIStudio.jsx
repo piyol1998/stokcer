@@ -228,8 +228,8 @@ function AIStudio() {
     const fetchIngredients = async () => {
         try {
             const [ingRes, stockRes] = await Promise.all([
-                supabase.from('ingredients').select('name, category, total_stock, unit').order('name', { ascending: true }),
-                supabase.from('stocks').select('name, quantity, status').order('name', { ascending: true })
+                supabase.from('ingredients').select('name, category, total_stock, unit').eq('user_id', ownerId).order('name', { ascending: true }),
+                supabase.from('stocks').select('name, quantity, status').eq('user_id', ownerId).order('name', { ascending: true })
             ]);
             setAllIngredients(ingRes.data || []);
             setDbStocks(stockRes.data || []);
@@ -315,9 +315,9 @@ function AIStudio() {
         setProcessing(true);
 
         const systemPrompt = `
-You are Cleith AI, an assistant for a perfume inventory system. You help the user manage their inventory, define recipes, and analyze notes. Use a professional and friendly Indonesian language.
+You are Stokcer AI, an advanced AI business assistant for users of the "Stokcer" platform. You help the user manage their business inventory, define production recipes, and analyze elements. Use a professional, highly intelligent, and friendly Indonesian language.
 
-Here is the real-time actual database context you have access to right now:
+Here is the real-time actual database context of THIS SPECIFIC USER's business that you are currently analyzing:
 <DATA_PRODUK_JADI>
 ${dbStocks.length > 0 ? dbStocks.map(s => `- ${s.name}: ${s.quantity} botol (Status: ${s.status || 'Ready'})`).join('\n') : "Belum ada produk jadi."}
 </DATA_PRODUK_JADI>
@@ -533,7 +533,7 @@ Do not use markdown inside the <RECIPE> block tags.
                         <Sparkles className="w-5 h-5 text-indigo-400" />
                     </div>
                     <div>
-                        <h2 className="text-xl font-bold text-slate-200 leading-none">AI Lab Cleith</h2>
+                        <h2 className="text-xl font-bold text-slate-200 leading-none">AI Studio Stokcer</h2>
                         <span className="text-xs text-indigo-400 flex items-center gap-1 mt-1">
                             {aiProvider === 'gemini' ? 'Google Gemini Engine' : aiProvider === 'openai' ? 'OpenAI GPT-4o' : 'DeepSeek Engine'}
                         </span>
@@ -548,11 +548,10 @@ Do not use markdown inside the <RECIPE> block tags.
                         <div className="w-20 h-20 rounded-3xl bg-slate-800/30 border border-slate-700/50 flex items-center justify-center mb-6 ring-4 ring-slate-900/50">
                             <BrainCircuit className="w-10 h-10 text-indigo-400" />
                         </div>
-                        <h3 className="text-2xl font-bold bg-gradient-to-r from-indigo-300 to-violet-400 bg-clip-text text-transparent">Apa yang bisa saya bantu?</h3>
+                        <h3 className="text-2xl font-bold bg-gradient-to-r from-indigo-300 to-violet-400 bg-clip-text text-transparent">Apa yang bisa Stokcer bantu?</h3>
                         <p className="text-slate-400 mt-3 text-sm leading-relaxed">
-                            Ketik pesan Anda atau upload foto resep/formula parfum. 
-                            AI akan secara cerdas medeteksi bahan-bahan, mencocokkannya dengan stok gudang Anda, 
-                            dan memberi rekomendasi.
+                            Ketik pesan Anda atau upload foto resep. 
+                            AI akan secara cerdas memproses data tersebut berdasarkan informasi dari gudang maupun inventaris rak khusus Anda tanpa bocor kemana-mana.
                         </p>
                     </div>
                 ) : (
@@ -684,7 +683,7 @@ Do not use markdown inside the <RECIPE> block tags.
                     
                     <div className="text-center mt-3">
                         <p className="text-[10px] text-slate-500">
-                            AI Lab Cleith dapat melakukan kesalahan. Pastikan untuk memverifikasi resep.
+                            Stokcer AI dapat melakukan kesalahan. Pastikan untuk selalu memverifikasi ulang data analisis.
                         </p>
                     </div>
                 </form>
