@@ -514,21 +514,20 @@ IMPORTANT: When you detect a recipe or formulation, you MUST format the recipe a
 }
 </RECIPE>
 
-IMPORTANT: Jika pengguna mengunggah gambar berupa DAFTAR INVENTARIS / DAFTAR BAHAN BAKU (bukan formula persentase resep), Anda WAJIB memformatnya sebagai blok JSON terstruktur di dalam tag <INVENTORY> seperti ini:
+IMPORTANT: Jika pengguna meminta untuk menambah, mengecek ketersediaan, mendata bahan baku (BUKAN RESEP), atau mensinkronisasi stok (baik melalui ketikan teks seperti "tambahkan bahan plum", "cek bahan X", maupun dengan mengunggah gambar), Anda WAJIB memformatnya sebagai blok JSON terstruktur di dalam tag <INVENTORY> seperti ini:
 <INVENTORY>
 {
-    "title": "Pengecekan Stok",
+    "title": "Pengecekan Stok & Bahan",
     "items": [
-        { "name": "Nama Bahan 1", "quantity": 100, "unit": "gr" },
-        { "name": "Nama Bahan 2", "quantity": 0, "unit": "ml" }
+        { "name": "Nama Bahan", "quantity": 0, "unit": "ml" }
     ]
 }
 </INVENTORY>
 
 MANDATORY INSTRUCTION (SANGAT PENTING): 
-Jika Anda menyadari bahwa gambar yang diunggah adalah DAFTAR BAHAN atau CEK INVENTARIS TEKS SAJA, JANGAN PERNAH membuat daftar markdown biasa! SELALU gunakan blok <INVENTORY> XML di atas agar sistem bisa mendeteksinya. Jika Anda membuat list biasa (markdown), sistem tidak akan bisa membacanya!
+Baik dari input teks maupun gambar, JIKA berhubungan dengan DAFTAR BAHAN atau CEK INVENTARIS, JANGAN PERNAH membuat daftar markdown biasa! SELALU gunakan blok <INVENTORY> XML di atas agar sistem bisa merender widget UI secara interaktif! Jika Anda membuat teks biasa (markdown), sistem tidak akan bisa mendeteksinya dan pengguna tidak akan bisa menekan tombol input UI.
 
-If there is no image and they ask a normal question, just reply nicely formatting your text in markdown.
+Jika pertanyaan pengguna benar-benar BUKAN tentang mendata/menambah/mengecek bahan maupun mendeteksi resep (contoh: "halo", "apa itu stokcer?", "bagaimana cara..."), barulah balas dengan teks markdown biasa.
 Do not use markdown inside the <RECIPE> or <INVENTORY> block tags.
         `.trim();
 
