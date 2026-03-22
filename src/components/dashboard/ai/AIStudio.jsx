@@ -137,17 +137,21 @@ const RecipeBlock = ({ data, allIngredients, onAddIngredient, onNavigate }) => {
                                 <tr>
                                     <th className="px-4 py-3 font-bold uppercase tracking-wider">Bahan Baku</th>
                                     <th className="px-4 py-3 font-bold uppercase tracking-wider">%</th>
+                                    <th className="px-4 py-3 font-bold uppercase tracking-wider">Kategori</th>
                                     <th className="px-4 py-3 font-bold uppercase tracking-wider">Note</th>
                                     <th className="px-4 py-3 font-bold uppercase tracking-wider">Status</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-800">
                                 {data.components.map((comp, idx) => {
-                                    const exists = allIngredients.some(i => i.name.toLowerCase().trim() === comp.name.toLowerCase().trim());
+                                    const matchedItem = allIngredients.find(i => i.name.toLowerCase().trim() === comp.name.toLowerCase().trim());
+                                    const exists = !!matchedItem;
+                                    const category = matchedItem ? matchedItem.category : '-';
                                     return (
                                         <tr key={idx} className="hover:bg-slate-800/30 transition-colors">
                                             <td className="px-4 py-3 font-medium text-slate-200">{comp.name}</td>
                                             <td className="px-4 py-3 text-indigo-400">{comp.percentage}%</td>
+                                            <td className="px-4 py-3 text-slate-400 text-[10px] uppercase font-semibold tracking-wider">{category}</td>
                                             <td className="px-4 py-3 text-slate-500">{comp.type}</td>
                                             <td className="px-4 py-3">
                                                 {exists ? (
