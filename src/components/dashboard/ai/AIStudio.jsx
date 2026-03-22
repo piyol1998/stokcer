@@ -27,7 +27,9 @@ import {
     FileText,
     ArrowUp,
     Bot,
-    Trash2
+    Trash2,
+    TrendingUp,
+    ShoppingBag
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -121,7 +123,6 @@ const RecipeBlock = ({ data, allIngredients, onAddIngredient, onNavigate }) => {
                             size="sm" 
                             className="bg-indigo-600 hover:bg-indigo-700 h-8 text-xs text-slate-100"
                             onClick={() => {
-                                // Enrich data with current matches from DB
                                 const enrichedData = {
                                     ...data,
                                     components: data.components.map(comp => {
@@ -150,7 +151,6 @@ const RecipeBlock = ({ data, allIngredients, onAddIngredient, onNavigate }) => {
                                     <th className="px-4 py-3 font-bold uppercase tracking-wider">Bahan Baku</th>
                                     <th className="px-4 py-3 font-bold uppercase tracking-wider">%</th>
                                     <th className="px-4 py-3 font-bold uppercase tracking-wider">Kategori</th>
-                                    <th className="px-4 py-3 font-bold uppercase tracking-wider">Note</th>
                                     <th className="px-4 py-3 font-bold uppercase tracking-wider">Status</th>
                                 </tr>
                             </thead>
@@ -158,13 +158,11 @@ const RecipeBlock = ({ data, allIngredients, onAddIngredient, onNavigate }) => {
                                 {data.components.map((comp, idx) => {
                                     const matchedItem = allIngredients.find(i => i.name.toLowerCase().trim() === comp.name.toLowerCase().trim());
                                     const exists = !!matchedItem;
-                                    const category = matchedItem ? matchedItem.category : '-';
                                     return (
                                         <tr key={idx} className="hover:bg-slate-800/30 transition-colors">
                                             <td className="px-4 py-3 font-medium text-slate-200">{comp.name}</td>
                                             <td className="px-4 py-3 text-indigo-400">{comp.percentage}%</td>
-                                            <td className="px-4 py-3 text-slate-400 text-[10px] uppercase font-semibold tracking-wider">{category}</td>
-                                            <td className="px-4 py-3 text-slate-500">{comp.type}</td>
+                                            <td className="px-4 py-3 text-slate-400 text-[10px] uppercase font-semibold tracking-wider">{matchedItem ? matchedItem.category : '-'}</td>
                                             <td className="px-4 py-3">
                                                 {exists ? (
                                                     <Badge className="bg-emerald-500/10 text-emerald-500 border-none text-[9px] h-5">
@@ -219,11 +217,8 @@ const InventoryCheckBlock = ({ data, allIngredients, onAddIngredient, onDeleteIn
                         <div className="divide-y divide-amber-500/10">
                             {missingItems.map((item, idx) => (
                                 <div key={idx} className="p-3 flex flex-col md:flex-row md:items-center justify-between gap-3 bg-slate-900/50">
-                                    <div>
+                                    <div className="flex-1">
                                         <p className="font-bold text-slate-200 text-sm">{item.name}</p>
-                                        {item.quantity !== undefined && (
-                                            <p className="text-xs text-slate-500">Kuantitas deteksi: {item.quantity} {item.unit}</p>
-                                        )}
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <Select 
@@ -237,8 +232,6 @@ const InventoryCheckBlock = ({ data, allIngredients, onAddIngredient, onDeleteIn
                                                 <SelectItem value="Bibit">Bibit</SelectItem>
                                                 <SelectItem value="Pelarut">Pelarut</SelectItem>
                                                 <SelectItem value="Material sintetik">Material sintetik</SelectItem>
-                                                <SelectItem value="Botol">Botol</SelectItem>
-                                                <SelectItem value="Box">Box</SelectItem>
                                             </SelectContent>
                                         </Select>
                                         <Button 
@@ -278,8 +271,7 @@ const InventoryCheckBlock = ({ data, allIngredients, onAddIngredient, onDeleteIn
                                     <tr>
                                         <th className="px-4 py-3 font-bold uppercase tracking-wider">Bahan Baku</th>
                                         <th className="px-4 py-3 font-bold uppercase tracking-wider">Kategori</th>
-                                        <th className="px-4 py-3 font-bold uppercase tracking-wider">Status Stokcer</th>
-                                        <th className="px-4 py-3 font-bold uppercase tracking-wider text-center">Link</th>
+                                        <th className="px-4 py-3 font-bold uppercase tracking-wider">Stok Saat Ini</th>
                                         <th className="px-4 py-3 font-bold uppercase tracking-wider text-right">Aksi</th>
                                     </tr>
                                 </thead>
@@ -289,29 +281,11 @@ const InventoryCheckBlock = ({ data, allIngredients, onAddIngredient, onDeleteIn
                                         return (
                                             <tr key={idx} className="hover:bg-slate-800/30 transition-colors">
                                                 <td className="px-4 py-3 font-medium text-slate-200">{dbItem?.name || item.name}</td>
-                                                <td className="px-4 py-3">
-                                                    <span className="text-[10px] text-slate-400 bg-slate-800 px-2 py-0.5 rounded-full border border-slate-700">
-                                                        {dbItem?.category || '-'}
-                                                    </span>
-                                                </td>
+                                                <td className="px-4 py-3 text-slate-400">{dbItem?.category || '-'}</td>
                                                 <td className="px-4 py-3">
                                                     <Badge className="bg-emerald-500/10 text-emerald-500 border-none text-[9px] h-5">
-                                                        <Check className="w-2 h-2 mr-1" /> Tersedia ({dbItem?.quantity || 0} {dbItem?.unit})
+                                                        <Check className="w-2 h-2 mr-1" /> {dbItem?.quantity || 0} {dbItem?.unit}
                                                     </Badge>
-                                                </td>
-                                                <td className="px-4 py-3 text-center">
-                                                    {dbItem?.purchase_link ? (
-                                                        <a 
-                                                            href={dbItem.purchase_link} 
-                                                            target="_blank" 
-                                                            rel="noopener noreferrer"
-                                                            className="text-indigo-400 hover:text-indigo-300 underline font-bold"
-                                                        >
-                                                            Beli
-                                                        </a>
-                                                    ) : (
-                                                        <span className="text-slate-600">-</span>
-                                                    )}
                                                 </td>
                                                 <td className="px-4 py-3 text-right">
                                                     <Button 
@@ -342,7 +316,7 @@ function AIStudio({ onNavigate }) {
     
     // Config States
     const [aiProvider, setAiProvider] = useState('gemini');
-    const [apiKey, setApiKey] = useState(''); // Gemini
+    const [apiKey, setApiKey] = useState('');
     const [openaiKey, setOpenaiKey] = useState('');
     const [deepseekKey, setDeepseekKey] = useState('');
     
@@ -364,7 +338,9 @@ function AIStudio({ onNavigate }) {
         totalBatches: 0,
         totalProducts: 0,
         totalMaterials: 0,
-        recentActivity: [],
+        totalSales: 0,
+        totalOrders: 0,
+        recentSales: [],
         employees: []
     });
     
@@ -410,21 +386,22 @@ function AIStudio({ onNavigate }) {
 
     const fetchDataContext = async () => {
         try {
-            const [ingRes, stockRes, profRes, prodRes, empRes, actRes, prodCountRes] = await Promise.all([
+            // Fetch all data including marketplace_orders
+            const [ingRes, stockRes, profRes, prodRes, empRes, salesRes] = await Promise.all([
                 supabase.from('raw_materials').select('*').eq('user_id', ownerId).is('deleted_at', null).order('name', { ascending: true }),
                 supabase.from('stocks').select('*').eq('user_id', ownerId).order('name', { ascending: true }),
                 supabase.from('profiles').select('*').eq('id', ownerId).single(),
                 supabase.from('production_history').select('*').eq('user_id', ownerId).order('created_at', { ascending: false }),
                 supabase.from('employees').select('*').eq('owner_id', ownerId),
-                supabase.from('transaction_notifications').select('*').eq('user_id', ownerId).order('created_at', { ascending: false }).limit(10),
-                supabase.from('production_history').select('*', { count: 'exact', head: true }).eq('user_id', ownerId)
+                supabase.from('marketplace_orders').select('*').eq('user_id', ownerId).order('created_at', { ascending: false })
             ]);
 
             const materials = ingRes.data || [];
             const stocks = stockRes.data || [];
             const history = prodRes.data || [];
-            const totalBatches = prodCountRes.count || 0;
+            const sales = salesRes.data || [];
 
+            // 1. Calculate Sisa Modal Bahan (8M Asset)
             let totalStockValue = 0;
             const priceMap = {};
             materials.forEach(m => {
@@ -435,17 +412,27 @@ function AIStudio({ onNavigate }) {
                 totalStockValue += (Number(m.quantity) || 0) * pricePerUnit;
             });
 
+            // 2. Calculate Total Modal Produksi (2M Consumed) - 100% Dashboard Sync
             let totalProductionCost = 0;
             history.forEach(record => {
-                if (record.total_cost) {
-                    totalProductionCost += Number(record.total_cost);
-                } else if (Array.isArray(record.ingredients_snapshot)) {
+                if (Array.isArray(record.ingredients_snapshot)) {
                     record.ingredients_snapshot.forEach(ing => {
-                        const qtyUsed = Number(ing.quantity) || 0;
-                        const unitPrice = Number(ing.pricePerUnit || ing.unit_price || priceMap[ing.materialId || ing.id] || 0);
-                        totalProductionCost += (qtyUsed * unitPrice);
+                        const qty = Number(ing.quantity) || 0;
+                        let unitPrice = 0;
+                        if (ing.pricePerUnit) {
+                            unitPrice = Number(ing.pricePerUnit);
+                        } else if (ing.materialId && priceMap[ing.materialId]) {
+                            unitPrice = priceMap[ing.materialId];
+                        }
+                        totalProductionCost += (qty * unitPrice);
                     });
                 }
+            });
+
+            // 3. Calculate Total Sales
+            let totalSalesAmount = 0;
+            sales.forEach(order => {
+                totalSalesAmount += Number(order.total_amount || 0);
             });
 
             setAllIngredients(materials);
@@ -455,10 +442,12 @@ function AIStudio({ onNavigate }) {
                 totalModalDikeluarkan: Math.round(totalProductionCost + totalStockValue),
                 sisaModalBahan: Math.round(totalStockValue),
                 totalProductionCost: Math.round(totalProductionCost),
-                totalBatches: totalBatches,
+                totalBatches: history.length,
                 totalProducts: stocks.length,
                 totalMaterials: materials.length,
-                recentActivity: actRes.data || [],
+                totalSales: Math.round(totalSalesAmount),
+                totalOrders: sales.length,
+                recentSales: sales.slice(0, 5),
                 employees: empRes.data || []
             });
         } catch (error) {
@@ -527,33 +516,26 @@ function AIStudio({ onNavigate }) {
         setProcessing(true);
 
         const systemPrompt = `
-You are Stokcer AI, the strategist for "${dbProfile?.business_name || 'Cleith'}". 
-BAHASA: INDONESIA.
+You are Stokcer AI Strategist for "${dbProfile?.business_name || 'Cleith'}". 
+BAHASA: INDONESIA. Tampil cerdas, teliti, dan menguasai angka.
 
-DATA REAL-TIME STOKCER:
-- Total Investasi: Rp ${dbStats.totalModalDikeluarkan.toLocaleString('id-ID')}
-- Sisa Aset Bahan: Rp ${dbStats.sisaModalBahan.toLocaleString('id-ID')}
-- Total Biaya Produksi: Rp ${dbStats.totalProductionCost.toLocaleString('id-ID')}
-- Total Batch Produksi: ${dbStats.totalBatches}
-- Total Produk Jadi: ${dbStats.totalProducts}
-- Total Item Bahan Baku: ${dbStats.totalMaterials}
+DASHBOARD DATA REAL-TIME:
+- Total Investasi (Harta Total): Rp ${dbStats.totalModalDikeluarkan.toLocaleString('id-ID')}
+- Aset Bahan Saat Ini (Gudang): Rp ${dbStats.sisaModalBahan.toLocaleString('id-ID')}
+- Total Biaya Produksi (Terpakai): Rp ${dbStats.totalProductionCost.toLocaleString('id-ID')}
+- Total Penjualan (Revenue): Rp ${dbStats.totalSales.toLocaleString('id-ID')}
+- Jumlah Pesanan: ${dbStats.totalOrders}
+- Riwayat Produksi: ${dbStats.totalBatches} Batch
 
-DATA KARYAWAN:
-${dbStats.employees.length > 0 ? dbStats.employees.map(e => `- ${e.name}: ${e.role}`).join('\n') : "Belum ada karyawan."}
-
-DEFINISI:
-1. Total Investasi: Seluruh modal yang pernah dikeluarkan (Bahan + Produksi).
-2. Sisa Aset Bahan: Nilai bahan yang masih ada di gudang/rak.
-3. Biaya Produksi: Modal yang SUDAH TERPAKAI untuk memproduksi barang.
+PESANAN TERAKHIR:
+${dbStats.recentSales.length > 0 ? dbStats.recentSales.map(s => `- Rp ${Number(s.total_amount).toLocaleString('id-ID')} (${s.created_at})`).join('\n') : "Belum ada pesanan masuk."}
 
 INSTRUKSI WAJIB:
-- Jika user tanya "berapa modal?" tanpa spesifik, Anda WAJIB bertanya balik: "Apakah maksud Anda Total Investasi (Rp ${dbStats.totalModalDikeluarkan.toLocaleString('id-ID')}), Sisa Aset (Rp ${dbStats.sisaModalBahan.toLocaleString('id-ID')}), atau Biaya Produksi (Rp ${dbStats.totalProductionCost.toLocaleString('id-ID')})?"
-- JANGAN PERNAH jawab Rp 0 jika data di atas menunjukkan angka selain 0.
-- Ekstrak resep dari gambar ke blok <RECIPE>:
-<RECIPE> {"title": "Recipe Name", "components": [{"name": "Material", "percentage": 10, "type": "Note"}]} </RECIPE>
-- Ekstrak cek bahan ke blok <INVENTORY>:
-<INVENTORY> {"title": "Inventory Check", "items": [{"name": "Material", "quantity": 0, "unit": "ml"}]} </INVENTORY>
-- Tampil cerdas, teliti, dan komunikatif seperti konsultan bisnis.
+- Jika user tanya "Modal", Anda HARUS bertanya balik: "Apakah maksud Anda Total Investasi (Rp ${dbStats.totalModalDikeluarkan.toLocaleString('id-ID')}), Aset Bahan (Rp ${dbStats.sisaModalBahan.toLocaleString('id-ID')}), atau Biaya Produksi (Rp ${dbStats.totalProductionCost.toLocaleString('id-ID')})?"
+- Jika user tanya "Berapa Penjualan" atau "Laku berapa", jawab berdasarkan angka Total Penjualan.
+- Pastikan Biaya Produksi selaras dengan Dashboard.
+- Format resep gunakan <RECIPE> ... </RECIPE> JSON.
+- Format cek stok gunakan <INVENTORY> ... </INVENTORY> JSON.
         `.trim();
 
         try {
@@ -561,8 +543,7 @@ INSTRUKSI WAJIB:
 
             if (aiProvider === 'openai') {
                 if (!openaiKey) throw new Error("API Key OpenAI tidak ditemukan.");
-                const cleanKey = openaiKey.trim();
-                const openai = new OpenAI({ apiKey: cleanKey, dangerouslyAllowBrowser: true });
+                const openai = new OpenAI({ apiKey: openaiKey.trim(), dangerouslyAllowBrowser: true });
                 const currentContent = [];
                 if (currentInput) currentContent.push({ type: "text", text: currentInput });
                 for (let imgObj of currentImages) {
@@ -574,10 +555,8 @@ INSTRUKSI WAJIB:
                     messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: currentContent }]
                 });
                 responseText = response.choices[0].message.content;
-
             } else {
                 if (!apiKey) throw new Error("API Key Gemini tidak ditemukan.");
-                const cleanKey = apiKey.trim();
                 const requestBody = {
                     contents: [{ role: "user", parts: [{ text: systemPrompt + "\n\n" + (currentInput || "Analisis gambar ini.") }] }]
                 };
@@ -587,7 +566,7 @@ INSTRUKSI WAJIB:
                     requestBody.contents[0].parts.push({ inlineData: { mimeType: b64Parts[0].match(/:(.*?);/)[1], data: b64Parts[1] } });
                 }
                 const modelToTry = currentImages.length > 0 ? "gemini-1.5-flash" : "gemini-2.0-flash";
-                const res = await fetch(`https://generativelanguage.googleapis.com/v1/models/${modelToTry}:generateContent?key=${cleanKey}`, {
+                const res = await fetch(`https://generativelanguage.googleapis.com/v1/models/${modelToTry}:generateContent?key=${apiKey.trim()}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(requestBody)
@@ -620,7 +599,7 @@ INSTRUKSI WAJIB:
             setMessages(prev => [...prev, {
                 id: Date.now().toString(),
                 role: 'assistant',
-                content: displayContent || "Hasil analisis visual terlampir.",
+                content: displayContent,
                 recipeData: parsedData,
                 inventoryData: invParsedData
             }]);
@@ -685,7 +664,15 @@ INSTRUKSI WAJIB:
                             <BrainCircuit className="w-10 h-10 text-indigo-400" />
                         </div>
                         <h3 className="text-2xl font-bold bg-gradient-to-r from-indigo-300 to-violet-400 bg-clip-text text-transparent">Ada yang bisa Stokcer bantu?</h3>
-                        <p className="text-slate-400 mt-3 text-sm">Tanyakan tentang modal, stok, atau upload foto resep parfum Anda.</p>
+                        <p className="text-slate-400 mt-3 text-sm">Tanyakan tentang modal, stok hari ini, atau upload foto resep/foto produk Anda.</p>
+                        <div className="grid grid-cols-2 gap-2 mt-6 w-full">
+                            <button onClick={() => setInputText("Laku berapa hari ini?")} className="p-2 bg-slate-800/50 rounded-lg text-[10px] text-slate-400 border border-slate-700 hover:bg-slate-700 transition-colors flex items-center gap-2">
+                                <TrendingUp className="w-3 h-3" /> Laku berapa hari ini?
+                            </button>
+                            <button onClick={() => setInputText("Berapa modal yang sudah terpakai?")} className="p-2 bg-slate-800/50 rounded-lg text-[10px] text-slate-400 border border-slate-700 hover:bg-slate-700 transition-colors flex items-center gap-2">
+                                <Database className="w-3 h-3" /> Berapa modal terpakai?
+                            </button>
+                        </div>
                     </div>
                 ) : (
                     messages.map((msg) => (
@@ -708,7 +695,7 @@ INSTRUKSI WAJIB:
                         </div>
                     ))
                 )}
-                {processing && <div className="max-w-4xl mx-auto text-indigo-400 text-xs animate-pulse pl-12">Stokcer AI sedang berpikir...</div>}
+                {processing && <div className="max-w-4xl mx-auto text-indigo-400 text-xs animate-pulse pl-12">Stokcer AI sedang menganalisis data bisnis Anda...</div>}
                 <div ref={chatEndRef} />
             </div>
 
@@ -724,18 +711,18 @@ INSTRUKSI WAJIB:
                             ))}
                         </div>
                     )}
-                    <div className="flex items-end bg-slate-900 border border-slate-700 rounded-2xl p-2 focus-within:border-indigo-500 transition-colors">
-                        <Button type="button" variant="ghost" size="icon" onClick={() => fileInputRef.current.click()} className="text-slate-400"><Plus /></Button>
+                    <div className="flex items-end bg-slate-900 border border-slate-700 rounded-2xl p-2 focus-within:border-indigo-500 transition-colors shadow-2xl">
+                        <Button type="button" variant="ghost" size="icon" onClick={() => fileInputRef.current.click()} className="text-slate-400 hover:text-white hover:bg-slate-800"><Plus /></Button>
                         <input type="file" ref={fileInputRef} onChange={handleImageChange} className="hidden" accept="image/*" multiple />
                         <textarea 
                             value={inputText}
                             onChange={(e) => setInputText(e.target.value)}
                             onPaste={handlePaste}
                             onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSubmit(); } }}
-                            placeholder="Tanya Chat AI atau upload foto..."
-                            className="flex-1 bg-transparent border-none text-slate-200 placeholder:text-slate-500 focus:ring-0 resize-none min-h-[44px] outline-none px-2"
+                            placeholder="Tanya 'Laku berapa hari ini?'"
+                            className="flex-1 bg-transparent border-none text-slate-200 placeholder:text-slate-500 focus:ring-0 resize-none min-h-[44px] outline-none px-2 text-sm py-2.5"
                         />
-                        <Button type="submit" disabled={processing || (!inputText.trim() && images.length === 0)} className="bg-indigo-600 hover:bg-indigo-500 rounded-xl"><ArrowUp /></Button>
+                        <Button type="submit" disabled={processing || (!inputText.trim() && images.length === 0)} className="bg-indigo-600 hover:bg-indigo-500 rounded-xl h-10 w-10 p-0 shrink-0 shadow-lg shadow-indigo-900/40"><ArrowUp className="w-5 h-5" /></Button>
                     </div>
                 </form>
             </div>
