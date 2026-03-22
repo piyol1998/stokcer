@@ -300,9 +300,9 @@ const InventoryCheckBlock = ({ data, allIngredients, onAddIngredient, onDeleteIn
                                                     </Badge>
                                                 </td>
                                                 <td className="px-4 py-3 text-center">
-                                                    {dbItem?.purchase_url ? (
+                                                    {dbItem?.purchase_link ? (
                                                         <a 
-                                                            href={dbItem.purchase_url} 
+                                                            href={dbItem.purchase_link} 
                                                             target="_blank" 
                                                             rel="noopener noreferrer"
                                                             className="text-indigo-400 hover:text-indigo-300 underline font-bold"
@@ -400,7 +400,7 @@ function AIStudio({ onNavigate }) {
     const fetchIngredients = async () => {
         try {
             const [ingRes, stockRes] = await Promise.all([
-                supabase.from('raw_materials').select('id, name, category, quantity, unit').eq('user_id', ownerId).is('deleted_at', null).order('name', { ascending: true }),
+                supabase.from('raw_materials').select('id, name, category, quantity, unit, purchase_link').eq('user_id', ownerId).is('deleted_at', null).order('name', { ascending: true }),
                 supabase.from('stocks').select('name, quantity, status').eq('user_id', ownerId).order('name', { ascending: true })
             ]);
             setAllIngredients(ingRes.data || []);
