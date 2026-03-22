@@ -296,17 +296,56 @@ function RecipeGrid({ onUpdate }) {
 
                         setGeneralInfo({ name: aiData.title || '', description: 'Hasil deteksi AI Studio Stokcer' });
                         
-                        const mappedMaterials = (aiData.components || []).map(comp => {
+                        // Group AI components by their actual category from the database
+                        const categoryGroups = {};
+                        (aiData.components || []).forEach(comp => {
                             const match = (fetchedMaterials || []).find(m => m.name.toLowerCase().trim() === comp.name?.toLowerCase().trim());
-                            return {
+                            // Use the material's actual category from DB, default to 'Bibit' if not found
+                            const category = match?.category || 'Bibit';
+                            if (!categoryGroups[category]) {
+                                categoryGroups[category] = [];
+                            }
+                            categoryGroups[category].push({
                                 id: match ? match.id : '',
-                                percent_share: comp.percentage || 0
-                            };
+                                percent_share: comp.percentage || 0,
+                                _name: comp.name // Keep name for debugging
+                            });
+                        });
+
+                        // Build sections from category groups
+                        const sections = Object.entries(categoryGroups).map(([catName, materials], idx) => {
+                            const totalPercent = materials.reduce((sum, m) => sum + (parseFloat(m.percent_share) || 0), 0);
+                            // Determine if this is a multi-material section
+                            const isMulti = materials.length > 1 || catName.toLowerCase().includes('bibit');
+                            
+                            if (isMulti) {
+                                // Recalculate percent_share relative to this section's total
+                                const adjustedMaterials = materials.map(m => ({
+                                    id: m.id,
+                                    percent_share: totalPercent > 0 ? Math.round((m.percent_share / totalPercent) * 100 * 100) / 100 : 0
+                                }));
+                                return {
+                                    id: `sec-ai-${idx}-${Date.now()}`,
+                                    name: catName,
+                                    percent: Math.round(totalPercent * 100) / 100,
+                                    type: 'multi',
+                                    materials: adjustedMaterials
+                                };
+                            } else {
+                                return {
+                                    id: `sec-ai-${idx}-${Date.now()}`,
+                                    name: catName,
+                                    percent: Math.round(totalPercent * 100) / 100,
+                                    type: 'single',
+                                    materialId: materials[0]?.id || '',
+                                    materials: []
+                                };
+                            }
                         });
 
                         setWizardData({
-                            sections: [
-                                { id: `sec-${Date.now()}`, name: 'Bibit', percent: 100, type: 'multi', materials: mappedMaterials }
+                            sections: sections.length > 0 ? sections : [
+                                { id: `sec-${Date.now()}`, name: 'Bibit', percent: 100, type: 'multi', materials: [] }
                             ],
                             additionalMaterials: []
                         });
