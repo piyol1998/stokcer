@@ -319,6 +319,14 @@ function SettingsPage() {
                                             value={formData.telegramChatId}
                                             onChange={e => setFormData({...formData, telegramChatId: e.target.value})}
                                         />
+                                        <Button 
+                                            onClick={handleSave} 
+                                            disabled={loading}
+                                            className="bg-indigo-600 hover:bg-indigo-500 text-white"
+                                        >
+                                            {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <BadgeCheck className="w-4 h-4 mr-2" />}
+                                            Simpan ID
+                                        </Button>
                                         <Button onClick={handleTestNotification} variant="outline" className="border-indigo-500/30 text-indigo-400 hover:bg-indigo-500/10">
                                             <Send className="w-4 h-4 mr-2" /> Test
                                         </Button>
