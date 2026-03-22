@@ -269,14 +269,21 @@ function RecipeGrid({ onUpdate }) {
     const [sectionSearchTerms, setSectionSearchTerms] = useState({});
 
     const availableCategories = React.useMemo(() => {
-        // Collect all categories and normalize them to uppercase
-        const normalizedCats = [...new Set(rawMaterials.map(m => (m.category || '').toUpperCase()).filter(Boolean))];
+        // Collect all categories preserving original case, deduplicate case-insensitively
+        const seen = new Map();
+        rawMaterials.forEach(m => {
+            const cat = (m.category || '').trim();
+            if (cat && !seen.has(cat.toUpperCase())) {
+                seen.set(cat.toUpperCase(), cat);
+            }
+        });
+        const cats = [...seen.values()];
 
-        // Priority for standard categories
+        // Priority for standard categories (case-insensitive matching)
         const priority = ['BIBIT', 'ALKOHOL', 'FIXATIVE', 'BOTOL', 'BOX'];
-        return normalizedCats.sort((a, b) => {
-            const indexA = priority.indexOf(a);
-            const indexB = priority.indexOf(b);
+        return cats.sort((a, b) => {
+            const indexA = priority.indexOf(a.toUpperCase());
+            const indexB = priority.indexOf(b.toUpperCase());
             if (indexA !== -1 && indexB !== -1) return indexA - indexB;
             if (indexA !== -1) return -1;
             if (indexB !== -1) return 1;
