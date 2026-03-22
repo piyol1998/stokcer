@@ -1007,7 +1007,7 @@ Do not use markdown inside the <RECIPE> or <INVENTORY> block tags.
                                 }
                             }}
                             placeholder="Tanya Chat AI, paste gambar langsung (Ctrl+V), atau ketik pesan..."
-                            className="flex-1 bg-transparent border-none text-slate-200 placeholder:text-slate-500 focus:ring-0 resize-none min-h-[44px] max-h-[250px] overflow-y-auto px-3 py-3 text-[15px] outline-none"
+                            className="flex-1 bg-transparent border-none text-slate-200 placeholder:text-slate-500 focus:ring-0 resize-none min-h-[44px] max-h-[170px] overflow-y-auto px-3 py-3 text-[15px] outline-none"
                             style={{ fieldSizing: "content" }}
                         />
 
