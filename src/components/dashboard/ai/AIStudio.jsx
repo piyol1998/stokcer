@@ -352,7 +352,7 @@ function AIStudio({ onNavigate }) {
     // Content States
     const [messages, setMessages] = useState([]);
     const [inputText, setInputText] = useState('');
-    const [images, setImages] = useState([]); // Array of { file, preview }
+    const [images, setImages] = useState([]); 
     
     const [allIngredients, setAllIngredients] = useState([]);
     const [dbStocks, setDbStocks] = useState([]);
@@ -362,6 +362,8 @@ function AIStudio({ onNavigate }) {
         sisaModalBahan: 0,
         totalProductionCost: 0,
         totalBatches: 0,
+        totalProducts: 0,
+        totalMaterials: 0,
         recentActivity: [],
         employees: []
     });
@@ -408,12 +410,11 @@ function AIStudio({ onNavigate }) {
 
     const fetchDataContext = async () => {
         try {
-            // Fetch everything including counts for accuracy
             const [ingRes, stockRes, profRes, prodRes, empRes, actRes, prodCountRes] = await Promise.all([
                 supabase.from('raw_materials').select('*').eq('user_id', ownerId).is('deleted_at', null).order('name', { ascending: true }),
                 supabase.from('stocks').select('*').eq('user_id', ownerId).order('name', { ascending: true }),
                 supabase.from('profiles').select('*').eq('id', ownerId).single(),
-                supabase.from('production_history').select('*').eq('user_id', ownerId).order('created_at', { ascending: false }).limit(20),
+                supabase.from('production_history').select('*').eq('user_id', ownerId).order('created_at', { ascending: false }),
                 supabase.from('employees').select('*').eq('owner_id', ownerId),
                 supabase.from('transaction_notifications').select('*').eq('user_id', ownerId).order('created_at', { ascending: false }).limit(10),
                 supabase.from('production_history').select('*', { count: 'exact', head: true }).eq('user_id', ownerId)
@@ -424,7 +425,6 @@ function AIStudio({ onNavigate }) {
             const history = prodRes.data || [];
             const totalBatches = prodCountRes.count || 0;
 
-            // 1. Hitung Nilai Aset Bahan Baku (Sisa Modal Bahan)
             let totalStockValue = 0;
             const priceMap = {};
             materials.forEach(m => {
@@ -435,10 +435,7 @@ function AIStudio({ onNavigate }) {
                 totalStockValue += (Number(m.quantity) || 0) * pricePerUnit;
             });
 
-            // 2. Hitung Total Biaya Produksi (Modal Terpakai)
             let totalProductionCost = 0;
-            // Kita hitung dari riwayat yang ada, tapi untuk statistik besar sebaiknya ada tabel agregat.
-            // Untuk sekarang, kita hitung dari data yang ditarik.
             history.forEach(record => {
                 if (record.total_cost) {
                     totalProductionCost += Number(record.total_cost);
@@ -458,70 +455,15 @@ function AIStudio({ onNavigate }) {
                 totalModalDikeluarkan: Math.round(totalProductionCost + totalStockValue),
                 sisaModalBahan: Math.round(totalStockValue),
                 totalProductionCost: Math.round(totalProductionCost),
-                totalBatches: totalBatches, // Gunakan count hasil query head: true
+                totalBatches: totalBatches,
                 totalProducts: stocks.length,
                 totalMaterials: materials.length,
                 recentActivity: actRes.data || [],
                 employees: empRes.data || []
             });
-
         } catch (error) {
             console.error("Fetch DB context error:", error);
         }
-    };
-
-    const addFiles = (files) => {
-        const validFiles = files.filter(f => f && f.type.startsWith('image/'));
-        if (!validFiles.length) return;
-        
-        validFiles.forEach(file => {
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                setImages(prev => [...prev, { file, preview: reader.result }]);
-            };
-            reader.readAsDataURL(file);
-        });
-    };
-
-    const handleImageChange = (e) => {
-        const files = Array.from(e.target.files || []);
-        addFiles(files);
-        if (fileInputRef.current) fileInputRef.current.value = '';
-    };
-
-    const handlePaste = (e) => {
-        const items = Array.from(e.clipboardData.items || []);
-        const files = [];
-        for (const item of items) {
-            if (item.type.indexOf("image") !== -1) {
-                files.push(item.getAsFile());
-            }
-        }
-        if (files.length > 0) {
-            e.preventDefault();
-            addFiles(files);
-        }
-    };
-
-    const removeImage = (index) => {
-        setImages(prev => prev.filter((_, i) => i !== index));
-    };
-
-    const fileToBase64 = (file) => new Promise((resolve) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result);
-        reader.readAsDataURL(file);
-    });
-
-    const fileToGenerativePart = async (file) => {
-        const base64EncodedDataPromise = new Promise((resolve) => {
-            const reader = new FileReader();
-            reader.onloadend = () => resolve(reader.result.split(',')[1]);
-            reader.readAsDataURL(file);
-        });
-        return {
-            inlineData: { data: await base64EncodedDataPromise, mimeType: file.type },
-        };
     };
 
     const addIngredient = async (name, category) => {
@@ -585,232 +527,77 @@ function AIStudio({ onNavigate }) {
         setProcessing(true);
 
         const systemPrompt = `
-You are Stokcer AI, the official highly advanced business strategist and assistant for "${dbProfile?.business_name || 'Sekali Pencet'}" (owned by ${dbProfile?.full_name || 'Owner'}). 
-You have FULL ACCESS to the business's real-time database, including inventory, production, financial metrics, and team management.
-You MUST provide professional, strategic, and highly intelligent analysis in Indonesian.
+You are Stokcer AI, the strategist for "${dbProfile?.business_name || 'Cleith'}". 
+BAHASA: INDONESIA.
 
-Here is the EXCLUSIVE real-time business intelligence context for ${dbProfile?.business_name || 'your company'}:
+DATA REAL-TIME STOKCER:
+- Total Investasi: Rp ${dbStats.totalModalDikeluarkan.toLocaleString('id-ID')}
+- Sisa Aset Bahan: Rp ${dbStats.sisaModalBahan.toLocaleString('id-ID')}
+- Total Biaya Produksi: Rp ${dbStats.totalProductionCost.toLocaleString('id-ID')}
+- Total Batch Produksi: ${dbStats.totalBatches}
+- Total Produk Jadi: ${dbStats.totalProducts}
+- Total Item Bahan Baku: ${dbStats.totalMaterials}
 
-<BUSINESS_PROFILE>
-- Name: ${dbProfile?.business_name || 'Not set'}
-- Owner: ${dbProfile?.full_name || 'Not set'}
-- Contact: ${dbProfile?.phone_number || 'Not set'}
-- Address: ${dbProfile?.address || 'Not set'}
-</BUSINESS_PROFILE>
+DATA KARYAWAN:
+${dbStats.employees.length > 0 ? dbStats.employees.map(e => `- ${e.name}: ${e.role}`).join('\n') : "Belum ada karyawan."}
 
-<FINANCIAL_METRICS_DASHBOARD>
-- Total Investasi (Modal Dikeluarkan): Rp ${dbStats.totalModalDikeluarkan.toLocaleString('id-ID')}
-- Aset Saat Ini (Sisa Modal Bahan Baku): Rp ${dbStats.sisaModalBahan.toLocaleString('id-ID')}
-- Total Modal Produksi (Terpakai): Rp ${dbStats.totalProductionCost.toLocaleString('id-ID')}
-- Total Batch Produksi: ${dbStats.totalBatches} batches
-- Total Jenis Produk Jadi: ${dbStats.totalProducts} jenis
-- Total Item Bahan Baku Aktif: ${dbStats.totalMaterials} item
-</FINANCIAL_METRICS_DASHBOARD>
+DEFINISI:
+1. Total Investasi: Seluruh modal yang pernah dikeluarkan (Bahan + Produksi).
+2. Sisa Aset Bahan: Nilai bahan yang masih ada di gudang/rak.
+3. Biaya Produksi: Modal yang SUDAH TERPAKAI untuk memproduksi barang.
 
-<TEAM_MANAGEMENT>
-${dbStats.employees.length > 0 ? dbStats.employees.map(e => `- ${e.name}: ${e.role} (ID: ${e.id.substring(0,5)})`).join('\n') : "Belum ada karyawan terdaftar."}
-</TEAM_MANAGEMENT>
-
-<RECENT_ACTIVITY_LOG>
-${dbStats.recentActivity.length > 0 ? dbStats.recentActivity.map(a => `- [${new Date(a.created_at).toLocaleDateString('id-ID')}] ${a.title}: ${a.message}`).join('\n') : "Belum ada aktivitas tercatat."}
-</RECENT_ACTIVITY_LOG>
-
-<DATA_PRODUK_JADI>
-${dbStocks.length > 0 ? dbStocks.map(s => `- ${s.name}: ${s.quantity} botol (Harga Jual: Rp ${s.selling_price?.toLocaleString() || 0})`).join('\n') : "Belum ada produk jadi yang terdaftar."}
-</DATA_PRODUK_JADI>
-
-<DATA_BAHAN_BAKU>
-${allIngredients.length > 0 ? allIngredients.map(i => `- ${i.name} [${i.category}]: ${i.quantity || 0} ${i.unit || 'ml'}`).join('\n') : "Belum ada bahan baku yang terdaftar."}
-</DATA_BAHAN_BAKU>
-
-STRATEGIC INSTRUCTIONS:
-- You are a business growth expert. Use the metrics above to give advice if asked.
-- If the user asks about "aktivitas terbaru", "siapa saja karyawan", or "berapa total investasi", answer accurately using the tags above.
-- If the user provides a formulation (recipe), extract it into <RECIPE> JSON.
-- If the user wants to add/check materials, extract into <INVENTORY> JSON.
-- If the user mentions TikTok Shop or Shopee integrations, acknowledge that you can see their marketplace settings (if any) and are ready to assist with multi-channel stock sync.
-- Always be helpful and forward-thinking.
-
-ATURAN PENTING (CRITICAL):
-- Jika pengguna bertanya tentang data stok, produk, atau bahan baku, gunakan data di atas untuk menjawab dengan akurat.
-- If the user uploads an image of a perfume formulation, or explicitly asks you to parse a recipe, you MUST detect all the components.
-- STRICT VOCABULARY MAPPING: When extracting the "name" of an ingredient for the JSON block, YOU MUST STRICTLY MATCH the name with one of the exact names from <DATA_BAHAN_BAKU> if it refers to the same material! For example, if the user's recipe says "Bergamot accord" or "Bergamot (citrus)", but the database only has "Bergamot", you MUST use EXACTLY "Bergamot" as the name in your JSON. Only use new names if the ingredient completely missing from the database.
-IMPORTANT: When you detect a recipe or formulation, you MUST format the recipe as a structured JSON block inside <RECIPE> tags like this:
-<RECIPE>
-{
-    "title": "Detected Recipe Name",
-    "components": [
-        { "name": "Ingredient Name", "percentage": 10, "type": "Top Note" },
-        { "name": "Another Ingredient", "percentage": 90, "type": "Base Note" }
-    ]
-}
-</RECIPE>
-
-IMPORTANT: Jika pengguna meminta untuk menambah, mengecek ketersediaan, mendata bahan baku (BUKAN RESEP), atau mensinkronisasi stok (baik melalui ketikan teks seperti "tambahkan bahan plum", "cek bahan X", maupun dengan mengunggah gambar), Anda WAJIB memformatnya sebagai blok JSON terstruktur di dalam tag <INVENTORY> seperti ini:
-<INVENTORY>
-{
-    "title": "Pengecekan Stok & Bahan",
-    "items": [
-        { "name": "Nama Bahan", "quantity": 0, "unit": "ml" }
-    ]
-}
-</INVENTORY>
-
-MANDATORY INSTRUCTION (SANGAT PENTING): 
-Baik dari input teks maupun gambar, JIKA berhubungan dengan DAFTAR BAHAN atau CEK INVENTARIS, JANGAN PERNAH membuat daftar markdown biasa! SELALU gunakan blok <INVENTORY> XML di atas agar sistem bisa merender widget UI secara interaktif! Jika Anda membuat teks biasa (markdown), sistem tidak akan bisa mendeteksinya dan pengguna tidak akan bisa menekan tombol input UI.
-
-Jika pertanyaan pengguna benar-benar BUKAN tentang mendata/menambah/mengecek bahan maupun mendeteksi resep (contoh: "halo", "apa itu stokcer?", "bagaimana cara..."), barulah balas dengan teks markdown biasa.
-Do not use markdown inside the <RECIPE> or <INVENTORY> block tags.
+INSTRUKSI WAJIB:
+- Jika user tanya "berapa modal?" tanpa spesifik, Anda WAJIB bertanya balik: "Apakah maksud Anda Total Investasi (Rp ${dbStats.totalModalDikeluarkan.toLocaleString('id-ID')}), Sisa Aset (Rp ${dbStats.sisaModalBahan.toLocaleString('id-ID')}), atau Biaya Produksi (Rp ${dbStats.totalProductionCost.toLocaleString('id-ID')})?"
+- JANGAN PERNAH jawab Rp 0 jika data di atas menunjukkan angka selain 0.
+- Ekstrak resep dari gambar ke blok <RECIPE>:
+<RECIPE> {"title": "Recipe Name", "components": [{"name": "Material", "percentage": 10, "type": "Note"}]} </RECIPE>
+- Ekstrak cek bahan ke blok <INVENTORY>:
+<INVENTORY> {"title": "Inventory Check", "items": [{"name": "Material", "quantity": 0, "unit": "ml"}]} </INVENTORY>
+- Tampil cerdas, teliti, dan komunikatif seperti konsultan bisnis.
         `.trim();
 
         try {
             let responseText = "";
 
             if (aiProvider === 'openai') {
-                if (!openaiKey) throw new Error("API Key OpenAI tidak ditemukan. Silakan atur di menu Integrasi.");
+                if (!openaiKey) throw new Error("API Key OpenAI tidak ditemukan.");
                 const cleanKey = openaiKey.trim();
                 const openai = new OpenAI({ apiKey: cleanKey, dangerouslyAllowBrowser: true });
-                
-                const messagesPayload = [
-                    { role: 'system', content: systemPrompt }
-                ];
-                
-                // Add short history context
-                messages.slice(-4).forEach(m => {
-                    messagesPayload.push({
-                        role: m.role,
-                        content: m.content || "Uploaded an image."
-                    });
-                });
-
-                // Add current message
                 const currentContent = [];
                 if (currentInput) currentContent.push({ type: "text", text: currentInput });
-                
                 for (let imgObj of currentImages) {
                     const b64 = await fileToBase64(imgObj.file);
                     currentContent.push({ type: "image_url", image_url: { url: b64 } });
                 }
-
-                if (currentContent.length === 0) currentContent.push({ type: "text", text: "Please process these images." });
-
-                messagesPayload.push({
-                    role: 'user',
-                    content: currentContent
-                });
-
                 const response = await openai.chat.completions.create({
                     model: currentImages.length > 0 ? "gpt-4o" : "gpt-4o-mini",
-                    messages: messagesPayload
+                    messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: currentContent }]
                 });
-
-                responseText = response.choices[0].message.content;
-
-            } else if (aiProvider === 'deepseek') {
-                if (!deepseekKey) throw new Error("API Key DeepSeek tidak ditemukan. Silakan atur di menu Integrasi.");
-                if (currentImages.length > 0) {
-                    throw new Error("DeepSeek belum mendukung upload gambar (Vision). Silakan gunakan Gemini atau OpenAI, atau hapus gambar dan ketik pesan.");
-                }
-                
-                const cleanKey = deepseekKey.trim();
-                const openai = new OpenAI({ apiKey: cleanKey, baseURL: 'https://api.deepseek.com', dangerouslyAllowBrowser: true });
-                
-                const messagesPayload = [
-                    { role: 'system', content: systemPrompt }
-                ];
-                
-                messages.slice(-4).forEach(m => {
-                    messagesPayload.push({
-                        role: m.role,
-                        content: m.content || ""
-                    });
-                });
-
-                messagesPayload.push({
-                    role: 'user',
-                    content: currentInput || "Hello"
-                });
-
-                const response = await openai.chat.completions.create({
-                    model: "deepseek-chat",
-                    messages: messagesPayload
-                });
-
                 responseText = response.choices[0].message.content;
 
             } else {
-                // Gemini Fallback via Native Fetch (Bypassing v1beta SDK 404 Bugs)
-                if (!apiKey) throw new Error("API Key Gemini tidak ditemukan. Silakan atur di menu Integrasi.");
-                
+                if (!apiKey) throw new Error("API Key Gemini tidak ditemukan.");
                 const cleanKey = apiKey.trim();
-                
                 const requestBody = {
-                    contents: [
-                        {
-                            role: "user",
-                            parts: [
-                                { text: systemPrompt + "\n\n" + (currentInput || "Tolong analisa gambar berikut.") }
-                            ]
-                        }
-                    ]
+                    contents: [{ role: "user", parts: [{ text: systemPrompt + "\n\n" + (currentInput || "Analisis gambar ini.") }] }]
                 };
-
                 for (let imgObj of currentImages) {
-                    const base64Data = await fileToBase64(imgObj.file);
-                    const b64Parts = base64Data.split(',');
-                    const mimeType = b64Parts[0].match(/:(.*?);/)[1];
-                    const data = b64Parts[1];
-                    
-                    requestBody.contents[0].parts.push({
-                        inlineData: { mimeType, data }
-                    });
+                    const b64 = await fileToBase64(imgObj.file);
+                    const b64Parts = b64.split(',');
+                    requestBody.contents[0].parts.push({ inlineData: { mimeType: b64Parts[0].match(/:(.*?);/)[1], data: b64Parts[1] } });
                 }
-
-                const apiModelsToTry = currentImages.length > 0
-                    ? ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]
-                    : ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-pro"];
-
-                let finalResponse = null;
-                let lastFetchError = null;
-
-                for (const modelId of apiModelsToTry) {
-                    const apiUrl = `https://generativelanguage.googleapis.com/v1/models/${modelId}:generateContent?key=${cleanKey}`;
-                    
-                    try {
-                        const tmpResponse = await fetch(apiUrl, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(requestBody)
-                        });
-
-                        if (tmpResponse.ok) {
-                            finalResponse = tmpResponse;
-                            break; 
-                        } else if (tmpResponse.status === 404) {
-                            lastFetchError = new Error(`Model ${modelId} 404`);
-                            continue; // Skip and try the next legacy/newer model
-                        } else {
-                            const errorJson = await tmpResponse.json().catch(() => ({}));
-                            throw new Error(`Google API: ${errorJson.error?.message || tmpResponse.statusText} (${tmpResponse.status})`);
-                        }
-                    } catch (e) {
-                        lastFetchError = e;
-                        if (!e.message.includes('404')) throw e; // Break loop on 400, 403, CORS
-                    }
-                }
-
-                if (!finalResponse) {
-                    throw lastFetchError || new Error(`Seluruh generasi model Gemini tidak dikenali (404 Error). Pastikan Akun Anda mendukung API ini.`);
-                }
-
-                const data = await finalResponse.json();
-                responseText = data.candidates[0]?.content?.parts[0]?.text || "Gagal mendapatkan respon (Kosong).";
+                const modelToTry = currentImages.length > 0 ? "gemini-1.5-flash" : "gemini-2.0-flash";
+                const res = await fetch(`https://generativelanguage.googleapis.com/v1/models/${modelToTry}:generateContent?key=${cleanKey}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(requestBody)
+                });
+                const data = await res.json();
+                responseText = data.candidates?.[0]?.content?.parts?.[0]?.text || "Gagal mendapatkan respon.";
             }
 
-            // Parse response for <RECIPE> tag
             const recipeRegex = /<RECIPE>([\s\S]*?)<\/RECIPE>/;
             const match = responseText.match(recipeRegex);
-            
             const inventoryRegex = /<INVENTORY>([\s\S]*?)<\/INVENTORY>/;
             const invMatch = responseText.match(inventoryRegex);
 
@@ -822,45 +609,61 @@ Do not use markdown inside the <RECIPE> or <INVENTORY> block tags.
                 try {
                     parsedData = JSON.parse(match[1].trim());
                     displayContent = responseText.replace(recipeRegex, '').trim();
-                } catch(e) {
-                    console.error("Failed to parse recipe json", e);
-                }
+                } catch(e) { console.error(e); }
             } else if (invMatch) {
                 try {
                     invParsedData = JSON.parse(invMatch[1].trim());
                     displayContent = responseText.replace(inventoryRegex, '').trim();
-                } catch(e) {
-                    console.error("Failed to parse inventory json", e);
-                }
+                } catch(e) { console.error(e); }
             }
 
-            const assistantMsg = {
-                id: Date.now().toString(),
-                role: 'assistant',
-                content: displayContent || "Berikut adalah hasil analisis resep atau bahan yang terdeteksi.",
-                recipeData: parsedData,
-                inventoryData: invParsedData
-            };
-
-            setMessages(prev => [...prev, assistantMsg]);
-
-        } catch (error) {
-            console.error("AI Analysis Error:", error);
             setMessages(prev => [...prev, {
                 id: Date.now().toString(),
                 role: 'assistant',
-                content: `⚠️ Error: ${error.message}`
+                content: displayContent || "Hasil analisis visual terlampir.",
+                recipeData: parsedData,
+                inventoryData: invParsedData
             }]);
-            toast({ title: "Gagal Analisis", description: error.message, variant: "destructive" });
+
+        } catch (error) {
+            setMessages(prev => [...prev, { id: Date.now().toString(), role: 'assistant', content: `⚠️ Error: ${error.message}` }]);
         } finally {
             setProcessing(false);
         }
     };
 
+    const fileToBase64 = (file) => new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.readAsDataURL(file);
+    });
+
+    const removeImage = (index) => setImages(prev => prev.filter((_, i) => i !== index));
+
+    const handleImageChange = (e) => {
+        const files = Array.from(e.target.files || []);
+        files.filter(f => f.type.startsWith('image/')).forEach(file => {
+            const reader = new FileReader();
+            reader.onloadend = () => setImages(prev => [...prev, { file, preview: reader.result }]);
+            reader.readAsDataURL(file);
+        });
+        if (fileInputRef.current) fileInputRef.current.value = '';
+    };
+
+    const handlePaste = (e) => {
+        const items = Array.from(e.clipboardData.items || []);
+        for (const item of items) {
+            if (item.type.indexOf("image") !== -1) {
+                const file = item.getAsFile();
+                const reader = new FileReader();
+                reader.onloadend = () => setImages(prev => [...prev, { file, preview: reader.result }]);
+                reader.readAsDataURL(file);
+            }
+        }
+    };
 
     return (
         <div className="flex flex-col h-[calc(100vh-6rem)] animate-in fade-in duration-500 overflow-hidden relative">
-            
             <header className="shrink-0 flex items-center justify-between pb-4 border-b border-slate-800">
                 <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-500/20 to-violet-500/20 flex items-center justify-center border border-indigo-500/30">
@@ -869,173 +672,73 @@ Do not use markdown inside the <RECIPE> or <INVENTORY> block tags.
                     <div>
                         <h2 className="text-xl font-bold text-slate-200 leading-none">AI Studio Stokcer</h2>
                         <span className="text-xs text-indigo-400 flex items-center gap-1 mt-1">
-                            {aiProvider === 'gemini' ? 'Google Gemini Engine' : aiProvider === 'openai' ? 'OpenAI GPT-4o' : 'DeepSeek Engine'}
+                            Integrasi Bisnis Real-time
                         </span>
                     </div>
                 </div>
             </header>
 
-            {/* Chat Messages Area */}
             <div className="flex-1 overflow-y-auto px-2 py-4 space-y-6 scroll-smooth">
                 {messages.length === 0 ? (
                     <div className="h-full flex flex-col items-center justify-center text-center p-8 max-w-lg mx-auto mt-10">
                         <div className="w-20 h-20 rounded-3xl bg-slate-800/30 border border-slate-700/50 flex items-center justify-center mb-6 ring-4 ring-slate-900/50">
                             <BrainCircuit className="w-10 h-10 text-indigo-400" />
                         </div>
-                        <h3 className="text-2xl font-bold bg-gradient-to-r from-indigo-300 to-violet-400 bg-clip-text text-transparent">Apa yang bisa Stokcer bantu?</h3>
-                        <p className="text-slate-400 mt-3 text-sm leading-relaxed">
-                            Ketik pesan Anda atau upload foto resep. 
-                            AI akan secara cerdas memproses data tersebut berdasarkan informasi dari gudang maupun inventaris rak khusus Anda tanpa bocor kemana-mana.
-                        </p>
+                        <h3 className="text-2xl font-bold bg-gradient-to-r from-indigo-300 to-violet-400 bg-clip-text text-transparent">Ada yang bisa Stokcer bantu?</h3>
+                        <p className="text-slate-400 mt-3 text-sm">Tanyakan tentang modal, stok, atau upload foto resep parfum Anda.</p>
                     </div>
                 ) : (
                     messages.map((msg) => (
                         <div key={msg.id} className={`flex gap-4 max-w-4xl mx-auto ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
-                            
-                            {/* Avatar */}
                             <div className={`shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${msg.role === 'user' ? 'bg-slate-700' : 'bg-indigo-600/20 border border-indigo-500/30'}`}>
                                 {msg.role === 'user' ? <User className="w-4 h-4 text-slate-300" /> : <Sparkles className="w-4 h-4 text-indigo-400" />}
                             </div>
-
-                            {/* Bubble */}
                             <div className={`flex flex-col gap-2 max-w-[85%] ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
-                                
                                 {msg.images && msg.images.length > 0 && (
                                     <div className="flex flex-wrap gap-2 justify-end">
-                                        {msg.images.map((imgPreview, idx) => (
-                                            <div key={idx} className="rounded-xl overflow-hidden border-2 border-slate-700 max-w-[200px] shrink-0">
-                                                <img src={imgPreview} alt="Uploaded" className="w-full h-auto object-cover" />
-                                            </div>
-                                        ))}
+                                        {msg.images.map((img, i) => <img key={i} src={img} className="rounded-xl border border-slate-700 max-w-[150px]" />)}
                                     </div>
                                 )}
-
-                                {msg.content && (
-                                    <div className={`px-5 py-3 rounded-2xl text-sm ${
-                                        msg.role === 'user' 
-                                            ? 'bg-slate-800 text-slate-200 rounded-tr-sm' 
-                                            : msg.role === 'assistant' && msg.content.startsWith('⚠️') 
-                                                ? 'bg-red-500/10 text-red-400 rounded-tl-sm border border-red-500/20'
-                                                : 'bg-transparent text-slate-300 p-0 leading-relaxed max-w-2xl whitespace-pre-line' 
-                                    }`}>
-                                        {msg.content}
-                                    </div>
-                                )}
-
-                                {msg.recipeData && (
-                                    <RecipeBlock 
-                                        data={msg.recipeData} 
-                                        allIngredients={allIngredients} 
-                                        onAddIngredient={addIngredient} 
-                                        onNavigate={onNavigate}
-                                    />
-                                )}
-
-                                {msg.inventoryData && (
-                                    <InventoryCheckBlock 
-                                        data={msg.inventoryData} 
-                                        allIngredients={allIngredients} 
-                                        onAddIngredient={addIngredient} 
-                                        onDeleteIngredient={deleteIngredient}
-                                    />
-                                )}
+                                <div className={`px-5 py-3 rounded-2xl text-sm ${msg.role === 'user' ? 'bg-slate-800 text-slate-200' : 'text-slate-300 whitespace-pre-line'}`}>
+                                    {msg.content}
+                                </div>
+                                {msg.recipeData && <RecipeBlock data={msg.recipeData} allIngredients={allIngredients} onAddIngredient={addIngredient} onNavigate={onNavigate} />}
+                                {msg.inventoryData && <InventoryCheckBlock data={msg.inventoryData} allIngredients={allIngredients} onAddIngredient={addIngredient} onDeleteIngredient={deleteIngredient} />}
                             </div>
                         </div>
                     ))
                 )}
-                
-                {processing && (
-                    <div className="flex gap-4 max-w-4xl mx-auto flex-row">
-                        <div className="shrink-0 w-8 h-8 rounded-full flex items-center justify-center bg-indigo-600/20 border border-indigo-500/30">
-                            <Sparkles className="w-4 h-4 text-indigo-400 animate-pulse" />
-                        </div>
-                        <div className="flex items-center bg-transparent px-5 py-3 h-11">
-                            <span className="flex gap-1">
-                                <span className="w-2 h-2 rounded-full bg-indigo-500 animate-bounce" style={{animationDelay: '0ms'}} />
-                                <span className="w-2 h-2 rounded-full bg-indigo-500 animate-bounce" style={{animationDelay: '150ms'}} />
-                                <span className="w-2 h-2 rounded-full bg-indigo-500 animate-bounce" style={{animationDelay: '300ms'}} />
-                            </span>
-                        </div>
-                    </div>
-                )}
+                {processing && <div className="max-w-4xl mx-auto text-indigo-400 text-xs animate-pulse pl-12">Stokcer AI sedang berpikir...</div>}
                 <div ref={chatEndRef} />
             </div>
 
-            {/* Input Area */}
             <div className="shrink-0 max-w-4xl mx-auto w-full pb-4 px-2">
-                <form onSubmit={handleSubmit} className="relative mt-2">
-                    
-                    {/* Image Previews attachment */}
+                <form onSubmit={handleSubmit} className="relative">
                     {images.length > 0 && (
-                        <div className="absolute -top-[100px] left-2 right-2 flex gap-3 overflow-x-auto pb-4 pt-2 z-10 custom-scrollbar pointer-events-auto">
-                            {images.map((imgObj, idx) => (
-                                <div key={idx} className="relative w-24 h-24 shrink-0 rounded-xl overflow-hidden border border-slate-700 bg-slate-900 shadow-xl">
-                                    <img src={imgObj.preview} className="w-full h-full object-cover" alt="Preview" />
-                                    <button type="button" onClick={() => removeImage(idx)} className="absolute top-1 right-1 w-6 h-6 bg-black/80 rounded-full flex items-center justify-center text-white hover:bg-black hover:text-red-400 transition-colors">
-                                        <X className="w-3.5 h-3.5" />
-                                    </button>
+                        <div className="flex gap-2 mb-2">
+                            {images.map((img, i) => (
+                                <div key={i} className="relative w-16 h-16 rounded-lg overflow-hidden border border-slate-700">
+                                    <img src={img.preview} className="w-full h-full object-cover" />
+                                    <button onClick={() => removeImage(i)} className="absolute top-0 right-0 bg-black/50 text-white p-0.5"><X size={10} /></button>
                                 </div>
                             ))}
                         </div>
                     )}
-
-                    <div className="flex items-end bg-slate-900/80 border border-slate-700 focus-within:border-slate-500 rounded-3xl p-2 shadow-sm transition-all shadow-black/20">
-                        
-                        <input 
-                            type="file" 
-                            ref={fileInputRef}
-                            onChange={handleImageChange}
-                            className="hidden" 
-                            accept="image/*"
-                            multiple
-                        />
-                        
-                        <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <Button type="button" variant="ghost" size="icon" className="shrink-0 rounded-full w-10 h-10 text-slate-400 hover:text-slate-200 hover:bg-slate-800">
-                                    <Plus className="w-5 h-5" />
-                                </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="start" sideOffset={8} className="bg-slate-900 border-slate-800 text-slate-300 w-48 shadow-2xl rounded-xl">
-                                <DropdownMenuItem onClick={() => fileInputRef.current?.click()} className="py-2.5 px-3 focus:bg-slate-800 focus:text-slate-100 cursor-pointer rounded-lg">
-                                    <ImagePlus className="w-4 h-4 mr-3" />
-                                    Upload Gambar/Foto
-                                </DropdownMenuItem>
-                                <DropdownMenuItem className="py-2.5 px-3 focus:bg-slate-800 focus:text-slate-100 cursor-pointer rounded-lg">
-                                    <FileText className="w-4 h-4 mr-3" />
-                                    Upload File Teks/PDF
-                                </DropdownMenuItem>
-                            </DropdownMenuContent>
-                        </DropdownMenu>
-
+                    <div className="flex items-end bg-slate-900 border border-slate-700 rounded-2xl p-2 focus-within:border-indigo-500 transition-colors">
+                        <Button type="button" variant="ghost" size="icon" onClick={() => fileInputRef.current.click()} className="text-slate-400"><Plus /></Button>
+                        <input type="file" ref={fileInputRef} onChange={handleImageChange} className="hidden" accept="image/*" multiple />
                         <textarea 
                             value={inputText}
                             onChange={(e) => setInputText(e.target.value)}
                             onPaste={handlePaste}
-                            onKeyDown={(e) => {
-                                if (e.key === 'Enter' && !e.shiftKey) {
-                                    e.preventDefault();
-                                    handleSubmit(e);
-                                }
-                            }}
-                            placeholder="Tanya Chat AI, paste gambar langsung (Ctrl+V), atau ketik pesan..."
-                            className="flex-1 bg-transparent border-none text-slate-200 placeholder:text-slate-500 focus:ring-0 resize-none min-h-[44px] max-h-[120px] overflow-y-auto px-3 py-3 text-[15px] outline-none"
-                            style={{ fieldSizing: "content" }}
+                            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSubmit(); } }}
+                            placeholder="Tanya Chat AI atau upload foto..."
+                            className="flex-1 bg-transparent border-none text-slate-200 placeholder:text-slate-500 focus:ring-0 resize-none min-h-[44px] outline-none px-2"
                         />
-
-                        <Button 
-                            type="submit" 
-                            disabled={processing || (!inputText.trim() && images.length === 0)}
-                            size="icon" 
-                            className={`shrink-0 rounded-full w-10 h-10 mb-0.5 mr-0.5 transition-colors ${inputText.trim() || images.length > 0 ? 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-md' : 'bg-slate-800 text-slate-500'}`}
-                        >
-                            <ArrowUp className="w-5 h-5" />
-                        </Button>
+                        <Button type="submit" disabled={processing || (!inputText.trim() && images.length === 0)} className="bg-indigo-600 hover:bg-indigo-500 rounded-xl"><ArrowUp /></Button>
                     </div>
-                    
                 </form>
             </div>
-            
         </div>
     );
 }
