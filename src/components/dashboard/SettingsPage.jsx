@@ -99,7 +99,7 @@ function SettingsPage() {
         const { error } = await supabase.functions.invoke('send-telegram-notification', {
             body: { 
                 chatId: formData.telegramChatId, 
-                message: "✅ Halo Owner! Ini adalah pesan uji coba dari sistem Stokcer. Telegram Anda sudah berhasil tersambung!" 
+                message: `✅ Halo ${formData.businessName}! Ini adalah pesan uji coba dari sistem Stokcer. Telegram Anda sudah berhasil tersambung!` 
             }
         });
         if (error) throw error;
