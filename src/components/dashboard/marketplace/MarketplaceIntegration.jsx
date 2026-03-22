@@ -10,6 +10,7 @@ import {
     RefreshCw, 
     Settings2, 
     CheckCircle2, 
+    XCircle,
     AlertCircle, 
     ShieldCheck,
     Box,
@@ -532,7 +533,36 @@ function MarketplaceIntegration() {
                                 </div>
                             </div>
                         </CardHeader>
-                        <CardContent className="space-y-4">
+                        <CardContent className="space-y-6">
+                            {(() => {
+                                const isConnected = !!(
+                                    (aiCreds.provider === 'gemini' && aiCreds.gemini_api_key) ||
+                                    (aiCreds.provider === 'openai' && aiCreds.openai_api_key) ||
+                                    (aiCreds.provider === 'deepseek' && aiCreds.deepseek_api_key)
+                                );
+                                const providerName = aiCreds.provider === 'openai' ? 'OpenAI (ChatGPT-4o)' 
+                                                    : aiCreds.provider === 'deepseek' ? 'DeepSeek AI' 
+                                                    : 'Google Gemini';
+                                return (
+                                    <div className={`p-4 rounded-xl border flex items-center justify-between transition-colors ${isConnected ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-rose-500/10 border-rose-500/20'}`}>
+                                        <div className="flex items-center gap-4">
+                                            <div className={`w-10 h-10 rounded-full flex items-center justify-center ${isConnected ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'}`}>
+                                                {isConnected ? <CheckCircle2 className="w-5 h-5" /> : <XCircle className="w-5 h-5" />}
+                                            </div>
+                                            <div>
+                                                <h4 className={`font-bold text-sm ${isConnected ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                                    {isConnected ? 'Status: Terhubung' : 'Status: API Key Kosong'}
+                                                </h4>
+                                                <p className="text-xs text-slate-400 mt-1">
+                                                    {isConnected ? `Sistem Cleith saat ini menggunakan mesin ` : 'Silakan lengkapi API Key di bawah untuk mesin '}
+                                                    <strong className="text-slate-200">{providerName}</strong>.
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })()}
+
                             <div className="p-4 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-xs text-indigo-300 leading-relaxed">
                                 AI akan digunakan di menu <strong>AI Studio</strong> untuk memproses foto resep formulasi, melakukan pengecekan bahan baku otomatis, dan memberikan prediksi stok di masa depan.
                             </div>
