@@ -229,7 +229,7 @@ function AIStudio() {
     const fetchIngredients = async () => {
         try {
             const [ingRes, stockRes] = await Promise.all([
-                supabase.from('ingredients').select('name, category, total_stock, unit').eq('user_id', ownerId).order('name', { ascending: true }),
+                supabase.from('raw_materials').select('name, category, quantity, unit').eq('user_id', ownerId).order('name', { ascending: true }),
                 supabase.from('stocks').select('name, quantity, status').eq('user_id', ownerId).order('name', { ascending: true })
             ]);
             setAllIngredients(ingRes.data || []);
@@ -277,13 +277,16 @@ function AIStudio() {
     const addIngredient = async (name, category) => {
         try {
             const { data, error } = await supabase
-                .from('ingredients')
+                .from('raw_materials')
                 .insert([{ 
                     user_id: ownerId, 
                     name, 
                     category,
-                    stock: 0,
-                    unit: 'ml'
+                    quantity: 0,
+                    unit: 'ml',
+                    price: 0,
+                    price_per_qty_amount: 1,
+                    min_stock: 10
                 }])
                 .select();
 
@@ -324,7 +327,7 @@ ${dbStocks.length > 0 ? dbStocks.map(s => `- ${s.name}: ${s.quantity} botol (Sta
 </DATA_PRODUK_JADI>
 
 <DATA_BAHAN_BAKU>
-${allIngredients.length > 0 ? allIngredients.map(i => `- ${i.name} [${i.category}]: ${i.total_stock || 0} ${i.unit || 'ml'}`).join('\n') : "Belum ada bahan baku."}
+${allIngredients.length > 0 ? allIngredients.map(i => `- ${i.name} [${i.category}]: ${i.quantity || 0} ${i.unit || 'ml'}`).join('\n') : "Belum ada bahan baku."}
 </DATA_BAHAN_BAKU>
 
 ATURAN PENTING (CRITICAL):
