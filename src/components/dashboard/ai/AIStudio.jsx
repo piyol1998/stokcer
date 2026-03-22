@@ -59,8 +59,6 @@ const isSimilar = (name1, name2) => {
 
 const RecipeBlock = ({ data, allIngredients, onAddIngredient, onNavigate }) => {
     const [missingCategories, setMissingCategories] = useState({});
-    
-    // Get unique categories from existing database to provide real options
     const existingCats = Array.from(new Set(allIngredients.map(i => i.category))).filter(Boolean);
     const defaultCat = existingCats.find(c => c.toLowerCase().includes('material')) || existingCats[0] || "Material sintetik";
 
@@ -71,14 +69,21 @@ const RecipeBlock = ({ data, allIngredients, onAddIngredient, onNavigate }) => {
     });
 
     const handleSaveFormula = () => {
+        // Prepare data for the Recipe Page - ABSOLUTE VALUE FIX
         const preparedData = {
             ...data,
+            // Flag to tell the New Recipe page to NOT normalize these values
+            isAiGenerated: true,
+            totalConcentration: 100, 
             components: data.components.map(c => {
                 const match = allIngredients.find(i => isSimilar(i.name, c.name));
                 return {
                     ...c,
-                    // PRIORITY: Use exact category from Database if match found
+                    // Use exact ID from database for proper linking
+                    materialId: match?.id,
+                    // Ensure category matches exactly what's in the DB
                     category: match ? match.category : (c.category || defaultCat),
+                    // Send exact percentage from AI
                     percentage: Number(c.percentage)
                 };
             })
@@ -104,15 +109,13 @@ const RecipeBlock = ({ data, allIngredients, onAddIngredient, onNavigate }) => {
                                     <span className="text-sm font-bold text-slate-200">{comp.name}</span>
                                     <div className="flex items-center gap-3">
                                         <Select value={missingCategories[comp.name] || defaultCat} onValueChange={(v) => setMissingCategories(p => ({...p, [comp.name]: v}))}>
-                                            <SelectTrigger className="w-44 h-9 text-[10px] bg-slate-950 border-slate-700 font-bold uppercase">
-                                                <SelectValue />
-                                            </SelectTrigger>
+                                            <SelectTrigger className="w-44 h-9 text-[10px] bg-slate-950 border-slate-700 font-bold uppercase"><SelectValue /></SelectTrigger>
                                             <SelectContent className="bg-slate-950 border-slate-800 text-slate-300">
                                                 {existingCats.map(cat => <SelectItem key={cat} value={cat}>{cat}</SelectItem>)}
                                                 {!existingCats.includes("Material sintetik") && <SelectItem value="Material sintetik">Material sintetik</SelectItem>}
                                             </SelectContent>
                                         </Select>
-                                        <Button size="sm" className="bg-amber-600 hover:bg-amber-500 h-9 px-6 text-[10px] font-black tracking-widest transition-transform active:scale-90" onClick={() => onAddIngredient(comp.name, missingCategories[comp.name] || defaultCat)}>
+                                        <Button size="sm" className="bg-amber-600 hover:bg-amber-500 h-9 px-6 text-[10px] font-black uppercase tracking-widest transition-transform active:scale-90" onClick={() => onAddIngredient(comp.name, missingCategories[comp.name] || defaultCat)}>
                                             <Plus className="w-4 h-4 mr-1.5" /> + INPUT
                                         </Button>
                                     </div>
@@ -126,12 +129,10 @@ const RecipeBlock = ({ data, allIngredients, onAddIngredient, onNavigate }) => {
             <Card className="bg-[#0f172a]/90 border-slate-700 shadow-2xl overflow-hidden backdrop-blur-2xl ring-1 ring-white/10">
                 <CardHeader className="p-6 border-b border-white/5 bg-gradient-to-r from-indigo-600/10 to-transparent flex flex-row items-center justify-between">
                     <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-2xl bg-indigo-500/20 flex items-center justify-center border border-indigo-500/30 shadow-inner">
-                            <FlaskConical className="w-6 h-6 text-indigo-400" />
-                        </div>
+                        <div className="w-12 h-12 rounded-2xl bg-indigo-500/20 flex items-center justify-center border border-indigo-500/30 shadow-inner"><FlaskConical className="w-6 h-6 text-indigo-400" /></div>
                         <div>
-                            <CardTitle className="text-lg font-black text-white tracking-tight uppercase">Resep Parfum Terdeteksi</CardTitle>
-                            <CardDescription className="text-xs text-slate-400 font-medium tracking-tight">Menampilkan kategori asli dari database Anda</CardDescription>
+                            <CardTitle className="text-lg font-black text-white leading-none uppercase tracking-tight">Resep Parfum Terdeteksi</CardTitle>
+                            <CardDescription className="text-[10px] text-slate-400 font-medium uppercase tracking-widest mt-1">Data Presisi 100% Sesuai Analisis AI</CardDescription>
                         </div>
                     </div>
                     <Button size="sm" className="bg-[#4143e2] hover:bg-[#4143e2]/90 text-[11px] font-black h-10 px-6 tracking-widest rounded-xl shadow-xl shadow-indigo-900/40 border border-indigo-500/50" onClick={handleSaveFormula}>
@@ -142,45 +143,25 @@ const RecipeBlock = ({ data, allIngredients, onAddIngredient, onNavigate }) => {
                     <div className="overflow-x-auto">
                         <table className="w-full text-xs text-left">
                             <thead className="bg-slate-950/80 text-slate-500 uppercase tracking-[0.2em] text-[10px] font-black border-b border-white/5">
-                                <tr>
-                                    <th className="px-6 py-5">Bahan Baku</th>
-                                    <th className="px-6 py-5">%</th>
-                                    <th className="px-6 py-5">Kategori</th>
-                                    <th className="px-6 py-5 text-right">Status Gudang</th>
-                                </tr>
+                                <tr><th className="px-6 py-5">Bahan Baku</th><th className="px-6 py-5">%</th><th className="px-6 py-5">Kategori</th><th className="px-6 py-5 text-right">Status Gudang</th></tr>
                             </thead>
                             <tbody className="divide-y divide-white/5">
                                 {data.components.map((comp, idx) => {
                                     const match = allIngredients.find(i => isSimilar(i.name, comp.name));
                                     return (
                                         <tr key={idx} className="group hover:bg-white/[0.03] transition-all duration-200">
-                                            <td className="px-6 py-5 font-bold tracking-tight">
+                                            <td className="px-6 py-5 font-bold tracking-tight text-slate-200 text-sm">
                                                 <div className="flex flex-col">
-                                                    <span className="text-slate-200 text-sm">{comp.name}</span>
+                                                    <span>{comp.name}</span>
                                                     {match && match.name.toLowerCase() !== comp.name.toLowerCase() && (
                                                         <span className="text-[9px] text-indigo-400 font-black tracking-widest uppercase mt-1">Stok: {match.name}</span>
                                                     )}
                                                 </div>
                                             </td>
-                                            <td className="px-6 py-5">
-                                                <span className="text-indigo-400 font-mono font-black text-sm bg-indigo-500/5 px-2 py-1 rounded border border-indigo-500/10">
-                                                    {comp.percentage}%
-                                                </span>
-                                            </td>
-                                            <td className="px-6 py-5">
-                                                <Badge className="bg-slate-800/80 text-slate-300 border border-white/5 font-black uppercase text-[9px] px-2 h-6 tracking-widest">
-                                                    {match ? match.category : (comp.category || defaultCat)}
-                                                </Badge>
-                                            </td>
+                                            <td className="px-6 py-5"><span className="text-indigo-400 font-mono font-black text-sm bg-indigo-500/5 px-2 py-1 rounded border border-indigo-500/10">{comp.percentage}%</span></td>
+                                            <td className="px-6 py-5"><Badge className="bg-slate-800/80 text-slate-300 border border-white/5 font-black uppercase text-[9px] px-2 h-6 tracking-widest">{match ? match.category : (comp.category || defaultCat)}</Badge></td>
                                             <td className="px-6 py-5 text-right">
-                                                {match ? 
-                                                    <span className="text-emerald-500 font-black flex items-center justify-end gap-2 text-[10px] uppercase tracking-widest">
-                                                        <Check className="w-4 h-4 bg-emerald-500/10 p-0.5 rounded-full" /> Ready
-                                                    </span> : 
-                                                    <span className="text-rose-500 font-black flex items-center justify-end gap-2 text-[10px] uppercase tracking-widest">
-                                                        <X className="w-4 h-4 bg-rose-500/10 p-0.5 rounded-full" /> Missing
-                                                    </span>
-                                                }
+                                                {match ? <span className="text-emerald-500 font-black flex items-center justify-end gap-2 text-[10px] uppercase tracking-widest"><Check className="w-4 h-4 bg-emerald-500/10 p-0.5 rounded-full" /> Ready</span> : <span className="text-rose-500 font-black flex items-center justify-end gap-2 text-[10px] uppercase tracking-widest"><X className="w-4 h-4 bg-rose-500/10 p-0.5 rounded-full" /> Missing</span>}
                                             </td>
                                         </tr>
                                     );
@@ -212,10 +193,7 @@ const InventoryCheckBlock = ({ data, allIngredients, onAddIngredient, onDeleteIn
                                     <td className="px-6 py-5 font-bold tracking-tight text-slate-200 text-sm">{item.name}</td>
                                     <td className="px-6 py-5 text-slate-400 text-[10px] uppercase font-black tracking-widest">{dbItem?.category || item.category || 'Material sintetik'}</td>
                                     <td className="px-6 py-5 text-right">
-                                        {dbItem ? 
-                                            <Button variant="ghost" size="sm" className="h-9 text-rose-500 hover:text-rose-400 font-black text-[10px] uppercase tracking-widest" onClick={() => onDeleteIngredient(dbItem.id, dbItem.name)}>HAPUS</Button> :
-                                            <Button size="sm" className="h-9 bg-emerald-600 hover:bg-emerald-500 text-[10px] px-6 font-black uppercase shadow-lg shadow-emerald-900/20" onClick={() => onAddIngredient(item.name, item.category || "Material sintetik")}>INPUT</Button>
-                                        }
+                                        {dbItem ? <Button variant="ghost" size="sm" className="h-9 text-rose-500 hover:text-rose-400 font-black text-[10px] uppercase tracking-widest" onClick={() => onDeleteIngredient(dbItem.id, dbItem.name)}>HAPUS</Button> : <Button size="sm" className="h-9 bg-emerald-600 hover:bg-emerald-500 text-[10px] px-6 font-black uppercase shadow-lg shadow-emerald-900/40" onClick={() => onAddIngredient(item.name, item.category || "Material sintetik")}>INPUT</Button>}
                                     </td>
                                 </tr>
                             );
@@ -325,7 +303,7 @@ function AIStudio({ onNavigate }) {
         setMessages(prev => [...prev, { id: Date.now().toString(), role: 'user', content: inputText, images: currentImages.map(img => img.preview) }]);
         setInputText(''); setImages([]); setProcessing(true);
         const systemPrompt = `Anda AI Ahli Kimia & Strategis Parfum Cleith. Bahasa: Indonesia.
-KATEGORI DI DATABASE: ${Array.from(new Set(allIngredients.map(i => i.category))).join(', ')}.
+Daftar Kategori Anda: ${Array.from(new Set(allIngredients.map(i => i.category))).join(', ')}.
 Wajib JSON <RECIPE>{"title": "Nama", "components": [{"name": "A", "percentage": 10, "category": "Kategori Sesuai Database", "note": "Top Note"}]}</RECIPE>.`;
         try {
             let responseText = "";
