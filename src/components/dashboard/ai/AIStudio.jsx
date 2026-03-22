@@ -356,6 +356,7 @@ function AIStudio({ onNavigate }) {
     
     const [allIngredients, setAllIngredients] = useState([]);
     const [dbStocks, setDbStocks] = useState([]);
+    const [dbProfile, setDbProfile] = useState(null);
     
     const fileInputRef = useRef(null);
     const chatEndRef = useRef(null);
@@ -367,7 +368,7 @@ function AIStudio({ onNavigate }) {
     useEffect(() => {
         if (ownerId) {
             fetchSettings();
-            fetchIngredients();
+            fetchDataContext();
         }
     }, [ownerId]);
 
@@ -397,14 +398,16 @@ function AIStudio({ onNavigate }) {
         }
     };
 
-    const fetchIngredients = async () => {
+    const fetchDataContext = async () => {
         try {
-            const [ingRes, stockRes] = await Promise.all([
+            const [ingRes, stockRes, profRes] = await Promise.all([
                 supabase.from('raw_materials').select('id, name, category, quantity, unit, purchase_link').eq('user_id', ownerId).is('deleted_at', null).order('name', { ascending: true }),
-                supabase.from('stocks').select('id, name, quantity, selling_price').eq('user_id', ownerId).order('name', { ascending: true })
+                supabase.from('stocks').select('id, name, quantity, selling_price').eq('user_id', ownerId).order('name', { ascending: true }),
+                supabase.from('profiles').select('*').eq('id', ownerId).single()
             ]);
             setAllIngredients(ingRes.data || []);
             setDbStocks(stockRes.data || []);
+            setDbProfile(profRes.data || null);
         } catch (error) {
             console.error("Fetch DB context error:", error);
         }
@@ -525,15 +528,25 @@ function AIStudio({ onNavigate }) {
         setProcessing(true);
 
         const systemPrompt = `
-You are Stokcer AI, an advanced AI business assistant for users of the "Stokcer" platform. You help the user manage their business inventory, define production recipes, and analyze elements. Use a professional, highly intelligent, and friendly Indonesian language.
+You are Stokcer AI, the official highly advanced business AI assistant for "${dbProfile?.business_name || 'Sekali Pencet'}" (a business owned by ${dbProfile?.full_name || 'Owner'}). 
+You help the user manage their business inventory, calculate production costs, define perfume recipes, and provide strategic business analysis. 
+You MUST use a professional, highly intelligent, and friendly Indonesian language. Always identify yourself as the assistant for ${dbProfile?.business_name || 'this business'}.
 
-Here is the real-time actual database context of THIS SPECIFIC USER's business that you are currently analyzing:
+Here is the EXCLUSIVE real-time database context for ${dbProfile?.business_name || 'the user'}'s business:
+
+<BUSINESS_PROFILE>
+- Business Name: ${dbProfile?.business_name || 'Not set'}
+- Owner Name: ${dbProfile?.full_name || 'Not set'}
+- Address: ${dbProfile?.address || 'Not set'}
+- Phone: ${dbProfile?.phone_number || 'Not set'}
+</BUSINESS_PROFILE>
+
 <DATA_PRODUK_JADI>
-${dbStocks.length > 0 ? dbStocks.map(s => `- ${s.name}: ${s.quantity} botol (Status: ${s.status || 'Ready'})`).join('\n') : "Belum ada produk jadi."}
+${dbStocks.length > 0 ? dbStocks.map(s => `- ${s.name}: ${s.quantity} botol (Harga Jual: Rp ${s.selling_price?.toLocaleString() || 0})`).join('\n') : "Belum ada produk jadi yang terdaftar."}
 </DATA_PRODUK_JADI>
 
 <DATA_BAHAN_BAKU>
-${allIngredients.length > 0 ? allIngredients.map(i => `- ${i.name} [${i.category}]: ${i.quantity || 0} ${i.unit || 'ml'}`).join('\n') : "Belum ada bahan baku."}
+${allIngredients.length > 0 ? allIngredients.map(i => `- ${i.name} [${i.category}]: ${i.quantity || 0} ${i.unit || 'ml'}`).join('\n') : "Belum ada bahan baku yang terdaftar."}
 </DATA_BAHAN_BAKU>
 
 ATURAN PENTING (CRITICAL):
