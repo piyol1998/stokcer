@@ -106,19 +106,48 @@ serve(async (req) => {
           replyText = aiData?.choices?.[0]?.message?.content || "Gagal mendapatkan respon AI."
         } else {
           const apiKey = aiCreds.gemini_api_key || GEMINI_API_KEY
-          const models = ["gemini-1.5-flash", "gemini-1.5-flash-8b", "gemini-pro"]
+          const models = ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-pro"]
+          let successText = ""
+          let errorReports: string[] = []
+          const cleanKey = encodeURIComponent(apiKey.trim())
+
           for (const mId of models) {
-            const res = await fetch(`https://generativelanguage.googleapis.com/v1/models/${mId}:generateContent?key=${apiKey}`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ contents: [{ parts: [{ text: `${context}\n\nOwner: ${text}` }] }] })
-            })
-            const data = await res.json()
-            if (data?.candidates?.[0]?.content?.parts?.[0]?.text) {
-              replyText = data.candidates[0].content.parts[0].text
-              break
+            try {
+              for (const ver of ["v1", "v1beta"]) {
+                const res = await fetch(`https://generativelanguage.googleapis.com/${ver}/models/${mId}:generateContent?key=${cleanKey}`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ contents: [{ parts: [{ text: `${context}\n\nOwner: ${text}` }] }] })
+                })
+                const data = await res.json()
+                if (data?.candidates?.[0]?.content?.parts?.[0]?.text) {
+                  successText = data.candidates[0].content.parts[0].text
+                  break
+                } else if (data.error) {
+                  errorReports.push(`[${ver}/${mId}: ${data.error.message}]`)
+                }
+              }
+              if (successText) break
+            } catch (e) {
+              errorReports.push(`[Error ${mId}: ${e.message}]`)
             }
           }
+          
+          if (!successText && aiCreds.openai_api_key) {
+            console.log("LOG: Gemini gagal, mencoba ban serep OpenAI...")
+            const retryRes = await fetch(`https://api.openai.com/v1/chat/completions`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${aiCreds.openai_api_key}` },
+              body: JSON.stringify({
+                model: 'gpt-4o-mini',
+                messages: [{ role: 'system', content: context }, { role: 'user', content: text }]
+              })
+            })
+            const retryData = await retryRes.json()
+            successText = retryData?.choices?.[0]?.message?.content || ""
+          }
+
+          replyText = successText || `❌ Kunci Google API Anda bermasalah (Not Found). Silakan gunakan kunci 'OpenAI' untuk hasil lebih stabil.`
         }
 
         await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
