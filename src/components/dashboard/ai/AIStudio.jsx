@@ -131,6 +131,7 @@ function AIStudio() {
                 "gemini-1.5-flash", 
                 "gemini-1.5-pro",
                 "gemini-1.5-flash-latest",
+                "gemini-1.0-pro-vision-latest",
                 "gemini-pro-vision"
             ];
             
@@ -169,7 +170,15 @@ function AIStudio() {
             }
 
             if (!result) {
-                throw lastError || new Error("Failed to generate content with any available model.");
+                // Diagnostic: Fetch available models to see what the API key actually has access to
+                try {
+                    const diagRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+                    const diagData = await diagRes.json();
+                    const availableModels = diagData.models ? diagData.models.map(m => m.name.replace('models/', '')).join(', ') : 'Tidak ada model';
+                    throw new Error(`[Diagnosis] API Key valid, tapi model tidak ditemukan. Model yang tersedia di API Key Anda: ${availableModels}. Error Asli: ${lastError?.message}`);
+                } catch (diagErr) {
+                    throw lastError || new Error(`Failed to generate content: ${diagErr.message}`);
+                }
             }
 
             const responseText = result.response.text();
