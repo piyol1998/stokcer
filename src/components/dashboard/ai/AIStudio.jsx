@@ -31,7 +31,6 @@ import {
 } from "@/components/ui/select";
 import OpenAI from "openai";
 
-// Perfumery Synonym Map
 const SYNONYMS = {
     'ambroxan': ['ambroxide', 'cetalox', 'ambrofix', 'ambrox'],
     'galaxolide': ['abbalide', 'musk 50'],
@@ -46,22 +45,15 @@ const SYNONYMS = {
 const isSimilar = (name1, name2) => {
     const n1 = name1.toLowerCase().trim();
     const n2 = name2.toLowerCase().trim();
-    
-    // Exact match
     if (n1 === n2) return true;
-    
-    // Partial Match (e.g. "Bergamot" in "Bergamot Accord")
     const cleanN1 = n1.replace(/[^a-z0-9]/g, '');
     const cleanN2 = n2.replace(/[^a-z0-9]/g, '');
     if (cleanN1.includes(cleanN2) || cleanN2.includes(cleanN1)) return true;
-
-    // Synonym Match
     for (const [key, aliases] of Object.entries(SYNONYMS)) {
         const isN1Match = n1.includes(key) || aliases.some(a => n1.includes(a));
         const isN2Match = n2.includes(key) || aliases.some(a => n2.includes(a));
         if (isN1Match && isN2Match) return true;
     }
-
     return false;
 };
 
@@ -74,6 +66,23 @@ const RecipeBlock = ({ data, allIngredients, onAddIngredient, onNavigate }) => {
         return !allIngredients.some(item => isSimilar(item.name, comp.name));
     });
 
+    const handleSaveFormula = () => {
+        // Prepare data for the Recipe Page (Normalization FIX)
+        // Ensure categories match system: Bibit, Pelarut, Bahan Tambahan
+        const preparedData = {
+            ...data,
+            components: data.components.map(c => ({
+                ...c,
+                // Map AI categories to System Categories
+                category: c.category?.toLowerCase().includes('pelarut') ? 'Pelarut' : 'Bibit',
+                // Keep the exact percentage from AI
+                percentage: Number(c.percentage)
+            }))
+        };
+        sessionStorage.setItem('pendingAiRecipe', JSON.stringify(preparedData));
+        if (onNavigate) onNavigate('recipes');
+    };
+
     return (
         <div className="space-y-5 my-4 w-full max-w-4xl animate-in fade-in slide-in-from-top-4 duration-500">
             {missing.length > 0 && (
@@ -81,7 +90,7 @@ const RecipeBlock = ({ data, allIngredients, onAddIngredient, onNavigate }) => {
                     <div className="bg-amber-600/20 px-6 py-3 border-b border-amber-500/20 flex items-center justify-between">
                         <div className="flex items-center gap-2">
                             <AlertTriangle className="w-5 h-5 text-amber-500" />
-                            <h3 className="text-xs font-black text-amber-500 uppercase tracking-widest">Peringatan: {missing.length} Bahan Belum Terdeteksi di Gudang</h3>
+                            <h3 className="text-xs font-black text-amber-500 uppercase tracking-widest">Input {missing.length} Bahan Ke Gudang :</h3>
                         </div>
                     </div>
                     <CardContent className="p-0">
@@ -90,20 +99,20 @@ const RecipeBlock = ({ data, allIngredients, onAddIngredient, onNavigate }) => {
                                 <div key={idx} className="px-6 py-4 flex items-center justify-between bg-slate-900/40 hover:bg-slate-900/60 transition-colors">
                                     <div className="flex flex-col">
                                         <span className="text-sm font-bold text-slate-200">{comp.name}</span>
-                                        <span className="text-[10px] text-slate-500 uppercase font-black tracking-tighter mt-1">Kategori AI: {comp.category}</span>
+                                        <span className="text-[10px] text-slate-500 uppercase font-black tracking-tighter mt-1">Saran: Kategori {comp.category || 'Bibit'}</span>
                                     </div>
                                     <div className="flex items-center gap-3">
-                                        <Select value={missingCategories[comp.name] || comp.category || "Material sintetik"} onValueChange={(v) => setMissingCategories(p => ({...p, [comp.name]: v}))}>
+                                        <Select value={missingCategories[comp.name] || "Bibit"} onValueChange={(v) => setMissingCategories(p => ({...p, [comp.name]: v}))}>
                                             <SelectTrigger className="w-36 h-9 text-[10px] bg-slate-950 border-slate-700 font-bold uppercase">
                                                 <SelectValue />
                                             </SelectTrigger>
                                             <SelectContent className="bg-slate-950 border-slate-800 text-slate-300">
                                                 <SelectItem value="Bibit">Bibit</SelectItem>
                                                 <SelectItem value="Pelarut">Pelarut</SelectItem>
-                                                <SelectItem value="Material sintetik">Material Sintetik</SelectItem>
+                                                <SelectItem value="Bahan Tambahan">Bahan Tambahan</SelectItem>
                                             </SelectContent>
                                         </Select>
-                                        <Button size="sm" className="bg-amber-600 hover:bg-amber-500 h-9 px-6 text-[10px] font-black tracking-widest transition-transform active:scale-90 shadow-lg shadow-amber-900/20" onClick={() => onAddIngredient(comp.name, missingCategories[comp.name] || comp.category || "Material sintetik")}>
+                                        <Button size="sm" className="bg-amber-600 hover:bg-amber-500 h-9 px-6 text-[10px] font-black tracking-widest transition-transform active:scale-90" onClick={() => onAddIngredient(comp.name, missingCategories[comp.name] || "Bibit")}>
                                             <Plus className="w-4 h-4 mr-1.5" /> + INPUT
                                         </Button>
                                     </div>
@@ -117,7 +126,7 @@ const RecipeBlock = ({ data, allIngredients, onAddIngredient, onNavigate }) => {
             <Card className="bg-[#0f172a]/90 border-slate-700 shadow-[0_32px_64px_-12px_rgba(0,0,0,0.8)] overflow-hidden backdrop-blur-2xl ring-1 ring-white/10">
                 <CardHeader className="p-6 border-b border-white/5 bg-gradient-to-r from-indigo-600/10 to-transparent flex flex-row items-center justify-between">
                     <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-2xl bg-indigo-500/20 flex items-center justify-center border border-indigo-500/30 shadow-inner">
+                        <div className="w-12 h-12 rounded-2xl bg-indigo-500/20 flex items-center justify-center border border-indigo-500/30">
                             <FlaskConical className="w-6 h-6 text-indigo-400" />
                         </div>
                         <div>
@@ -128,10 +137,7 @@ const RecipeBlock = ({ data, allIngredients, onAddIngredient, onNavigate }) => {
                     <Button 
                         size="sm" 
                         className="bg-[#4143e2] hover:bg-[#4143e2]/90 text-[11px] font-black h-10 px-6 tracking-widest rounded-xl shadow-xl shadow-indigo-900/40 border border-indigo-500/50" 
-                        onClick={() => {
-                             sessionStorage.setItem('pendingAiRecipe', JSON.stringify(data));
-                             if (onNavigate) onNavigate('recipes');
-                        }}
+                        onClick={handleSaveFormula}
                     >
                          <Check className="w-4 h-4 mr-2" /> SIMPAN FORMULA
                     </Button>
@@ -153,9 +159,9 @@ const RecipeBlock = ({ data, allIngredients, onAddIngredient, onNavigate }) => {
                                     const match = allIngredients.find(i => isSimilar(i.name, comp.name));
                                     return (
                                         <tr key={idx} className="group hover:bg-white/[0.03] transition-all duration-200">
-                                            <td className="px-6 py-5">
+                                            <td className="px-6 py-5 font-bold tracking-tight">
                                                 <div className="flex flex-col">
-                                                    <span className="text-slate-200 font-bold text-sm tracking-tight">{comp.name}</span>
+                                                    <span className="text-slate-200 text-sm">{comp.name}</span>
                                                     {match && match.name.toLowerCase() !== comp.name.toLowerCase() && (
                                                         <span className="text-[9px] text-indigo-400 font-black tracking-widest uppercase mt-1">Stok: {match.name}</span>
                                                     )}
@@ -167,12 +173,10 @@ const RecipeBlock = ({ data, allIngredients, onAddIngredient, onNavigate }) => {
                                                 </span>
                                             </td>
                                             <td className="px-6 py-5 text-slate-400 font-black uppercase text-[10px] tracking-widest">
-                                                {comp.category || (match ? match.category : 'MATERIAL SINTETIK')}
+                                                {comp.category || 'Bibit'}
                                             </td>
-                                            <td className="px-6 py-5">
-                                                <Badge className="bg-slate-800/80 text-slate-400 border border-white/5 font-black uppercase text-[9px] px-2 h-6 tracking-widest">
-                                                    {comp.note || 'Heart Note'}
-                                                </Badge>
+                                            <td className="px-6 py-5 uppercase font-black text-[9px] text-slate-500 tracking-wider">
+                                                {comp.note || 'Middle Note'}
                                             </td>
                                             <td className="px-6 py-5 text-right">
                                                 {match ? 
@@ -202,7 +206,7 @@ const InventoryCheckBlock = ({ data, allIngredients, onAddIngredient, onDeleteIn
         <Card className="bg-[#0f172a]/80 border-slate-700 my-4 w-full max-w-4xl shadow-2xl backdrop-blur-xl overflow-hidden animate-in fade-in duration-300">
             <CardHeader className="p-5 border-b border-white/5 bg-slate-800/20">
                 <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-emerald-500/20 flex items-center justify-center border border-emerald-500/30 text-emerald-400">
+                    <div className="w-9 h-9 rounded-xl bg-emerald-500/20 flex items-center justify-center border border-emerald-500/30 text-emerald-400 shadow-inner">
                         <Database className="w-5 h-5" />
                     </div>
                     <CardTitle className="text-sm font-black text-slate-200 uppercase tracking-widest">Hasil Scan Inventaris</CardTitle>
@@ -222,17 +226,12 @@ const InventoryCheckBlock = ({ data, allIngredients, onAddIngredient, onDeleteIn
                             const dbItem = allIngredients.find(i => isSimilar(i.name, item.name));
                             return (
                                 <tr key={idx} className="hover:bg-white/[0.03] transition-colors">
-                                    <td className="px-6 py-5">
-                                        <div className="flex flex-col">
-                                            <span className="text-slate-200 font-bold text-sm tracking-tight">{item.name}</span>
-                                            {dbItem && <span className="text-[9px] text-emerald-500 font-black uppercase mt-1">Stok: {dbItem.quantity} {dbItem.unit}</span>}
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-5 text-slate-400 text-[10px] uppercase font-black tracking-widest">{dbItem?.category || item.category || 'Material'}</td>
+                                    <td className="px-6 py-5 font-bold tracking-tight text-slate-200 text-sm">{item.name}</td>
+                                    <td className="px-6 py-5 text-slate-400 text-[10px] uppercase font-black tracking-widest">{dbItem?.category || item.category || 'Bibit'}</td>
                                     <td className="px-6 py-5 text-right">
                                         {dbItem ? 
                                             <Button variant="ghost" size="sm" className="h-9 text-rose-500 hover:text-rose-400 hover:bg-rose-500/10 px-4 font-black text-[10px] uppercase tracking-widest" onClick={() => onDeleteIngredient(dbItem.id, dbItem.name)}>HAPUS</Button> :
-                                            <Button size="sm" className="h-9 bg-emerald-600 hover:bg-emerald-500 text-[10px] px-6 font-black uppercase tracking-widest shadow-lg shadow-emerald-900/40" onClick={() => onAddIngredient(item.name, item.category || "Material sintetik")}>INPUT</Button>
+                                            <Button size="sm" className="h-9 bg-emerald-600 hover:bg-emerald-500 text-[10px] px-6 font-black uppercase tracking-widest shadow-lg shadow-emerald-900/20" onClick={() => onAddIngredient(item.name, item.category || "Bibit")}>INPUT</Button>
                                         }
                                     </td>
                                 </tr>
@@ -299,11 +298,9 @@ function AIStudio({ onNavigate }) {
                 supabase.from('production_history').select('*').eq('user_id', ownerId),
                 supabase.from('marketplace_orders').select('*').eq('user_id', ownerId).limit(5)
             ]);
-
             const materials = ingRes.data || [];
             const history = prodRes.data || [];
             const sales = salesRes.data || [];
-
             let totalStockValue = 0;
             const priceMap = {};
             materials.forEach(m => {
@@ -311,7 +308,6 @@ function AIStudio({ onNavigate }) {
                 priceMap[m.id] = pricePerUnit;
                 totalStockValue += (Number(m.quantity) || 0) * pricePerUnit;
             });
-
             let totalProductionCost = 0;
             history.forEach(record => {
                 if (Array.isArray(record.ingredients_snapshot)) {
@@ -322,10 +318,8 @@ function AIStudio({ onNavigate }) {
                     });
                 }
             });
-
             let totalSalesAmount = 0;
             sales.forEach(o => { totalSalesAmount += Number(o.total_amount || 0); });
-
             setAllIngredients(materials);
             setDbProfile(profRes.data || null);
             setDbStats({
@@ -342,7 +336,7 @@ function AIStudio({ onNavigate }) {
         try {
             const { data, error } = await supabase.from('raw_materials').insert([{ user_id: ownerId, name, category, quantity: 0, unit: 'ml', price: 0, price_per_qty_amount: 1, min_stock: 10 }]).select();
             if (error) throw error;
-            toast({ title: "Berhasil!", description: `${name} telah masuk ke daftar bahan baku Anda.` });
+            toast({ title: "Berhasil Input", description: `${name} telah masuk ke gudang Stokcer.` });
             setAllIngredients(prev => [...prev, ...data]);
         } catch (e) { toast({ title: "Gagal", description: e.message, variant: "destructive" }); }
     };
@@ -352,7 +346,7 @@ function AIStudio({ onNavigate }) {
         try {
             await supabase.from('raw_materials').update({ deleted_at: new Date().toISOString() }).eq('id', id);
             setAllIngredients(prev => prev.filter(i => i.id !== id));
-            toast({ title: "Terhapus", description: `${name} telah dikeluarkan dari gudang.` });
+            toast({ title: "Sudah Dihapus", description: `${name} telah dikeluarkan.` });
         } catch (e) { console.error(e); }
     };
 
@@ -363,19 +357,18 @@ function AIStudio({ onNavigate }) {
         const currentInput = inputText;
         setMessages(prev => [...prev, { id: Date.now().toString(), role: 'user', content: inputText, images: currentImages.map(img => img.preview) }]);
         setInputText(''); setImages([]); setProcessing(true);
-
         const systemPrompt = `Anda AI Ahli Kimia & Strategis Parfum Cleith. Bahasa: Indonesia.
-ATURAN KHUSUS:
-- Ambroxan, Ambroxide, Cetalox, Ambrofix adalah benda yang SAMA.
-- Galaxolide & Abbalide adalah SAMA.
-- Jika mendeteksi formula, wajib JSON <RECIPE>{"title": "Nama", "components": [{"name": "A", "percentage": 10, "category": "Material", "note": "Top Note"}]}</RECIPE>.
-- Berikan wawasan mendalam tentang karakter aroma jika terdeteksi formula.`;
-
+ATURAN KATEGORI STOKCER:
+- Bibit: Inti parfum (EO, Aroma Chemicals).
+- Pelarut: Alkohol, DPG, Fixative.
+- Bahan Tambahan: Pewarna, Anti-UV.
+MODAL: Rp ${dbStats.totalModalDikeluarkan.toLocaleString('id-ID')}.
+Wajib JSON <RECIPE>{"title": "Nama", "components": [{"name": "A", "percentage": 10, "category": "Bibit", "note": "Top Note"}]}</RECIPE>.`;
         try {
             let responseText = "";
             if (aiProvider === 'openai' && openaiKey) {
                 const openai = new OpenAI({ apiKey: openaiKey.trim(), dangerouslyAllowBrowser: true });
-                const content = [{ type: "text", text: currentInput || "Tolong analisis ini secara detail." }];
+                const content = [{ type: "text", text: currentInput || "Analisis resep ini." }];
                 for (let i of currentImages) content.push({ type: "image_url", image_url: { url: await fileToBase64(i.file) } });
                 const res = await openai.chat.completions.create({ model: "gpt-4o-mini", messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content }] });
                 responseText = res.choices[0].message.content;
@@ -387,45 +380,39 @@ ATURAN KHUSUS:
                 }
                 const res = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey.trim()}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
                 const data = await res.json();
-                responseText = data.candidates?.[0]?.content?.parts?.[0]?.text || "AI sedang melakukan reset koneksi...";
+                responseText = data.candidates?.[0]?.content?.parts?.[0]?.text || "Koneksi Reset.";
             }
-
             const recipeRegex = /<RECIPE>([\s\S]*?)<\/RECIPE>/;
             const inventoryRegex = /<INVENTORY>([\s\S]*?)<\/INVENTORY>/;
             let parsedRecipe = null; let parsedInv = null;
             if (responseText.match(recipeRegex)) { try { parsedRecipe = JSON.parse(responseText.match(recipeRegex)[1].trim()); responseText = responseText.replace(recipeRegex, ''); } catch(e){} }
             if (responseText.match(inventoryRegex)) { try { parsedInv = JSON.parse(responseText.match(inventoryRegex)[1].trim()); responseText = responseText.replace(inventoryRegex, ''); } catch(e){} }
-
             setMessages(prev => [...prev, { id: Date.now().toString(), role: 'assistant', content: responseText, recipeData: parsedRecipe, inventoryData: parsedInv }]);
         } catch (e) { setMessages(prev => [...prev, { id: Date.now().toString(), role: 'assistant', content: `⚠️ Error: ${e.message}` }]); } finally { setProcessing(false); }
     };
-
     const fileToBase64 = (file) => new Promise((resolve) => {
         const reader = new FileReader(); reader.onloadend = () => resolve(reader.result); reader.readAsDataURL(file);
     });
-
     if (loading) return <div className="flex h-full items-center justify-center p-20"><Loader2 className="animate-spin text-indigo-500 w-12 h-12" /></div>;
-
     return (
         <div className="flex flex-col h-[calc(100vh-6rem)] animate-in fade-in duration-500 overflow-hidden relative">
             <header className="shrink-0 flex items-center justify-between pb-4 border-b border-slate-800">
                 <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-2xl bg-indigo-600/10 flex items-center justify-center border border-indigo-600/20 shadow-inner">
+                    <div className="w-12 h-12 rounded-2xl bg-indigo-600/10 flex items-center justify-center border border-indigo-500/20 shadow-inner">
                         <Sparkles className="w-6 h-6 text-indigo-400" />
                     </div>
                     <div>
                         <h2 className="text-xl font-black text-white leading-none uppercase tracking-tight">AI Studio Stokcer</h2>
-                        <span className="text-[10px] text-indigo-500 font-black tracking-widest uppercase mt-2 block tracking-widest">Perfume Intelligence Deep Analysis</span>
+                        <span className="text-[10px] text-indigo-500 font-black tracking-widest uppercase mt-2 block tracking-widest">Perfume Intelligence System</span>
                     </div>
                 </div>
             </header>
-
             <div className="flex-1 overflow-y-auto px-2 py-8 space-y-10 scroll-smooth">
                 {messages.length === 0 ? (
                     <div className="h-full flex flex-col items-center justify-center text-center p-8 max-w-lg mx-auto grayscale opacity-40">
                         <BrainCircuit className="w-20 h-20 text-indigo-500 mb-8" />
                         <h3 className="text-3xl font-black text-white uppercase tracking-tighter">Strategic Intelligence</h3>
-                        <p className="text-slate-500 mt-3 text-sm font-medium italic">Siap menganalisis modal, stok, dan rahasia aroma parfum Anda.</p>
+                        <p className="text-slate-500 mt-3 text-sm font-bold italic">Siap menganalisis resep parfum & data keuangan Anda.</p>
                     </div>
                 ) : (
                     messages.map((msg) => (
@@ -448,41 +435,20 @@ ATURAN KHUSUS:
                         </div>
                     ))
                 )}
-                {processing && <div className="max-w-4xl mx-auto flex items-center gap-4 pl-20 animate-pulse text-indigo-400">
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                    <span className="text-[10px] font-black uppercase tracking-[0.3em]">AI Alchemist is analyzing...</span>
-                </div>}
+                {processing && <div className="max-w-4xl mx-auto flex items-center gap-4 pl-20 animate-pulse text-indigo-400 font-bold uppercase tracking-widest text-[10px]">AI is analyzing...</div>}
                 <div ref={chatEndRef} />
             </div>
-
             <div className="shrink-0 max-w-5xl mx-auto w-full pb-8 px-2">
                 <form onSubmit={handleSubmit} className="relative">
                     <div className="flex items-center gap-3 bg-[#0f172a] border border-white/10 rounded-[2rem] p-3 pl-5 pr-3 shadow-3xl focus-within:border-indigo-500/50 transition-all duration-300">
-                        <Button type="button" variant="ghost" size="icon" onClick={() => fileInputRef.current?.click()} className="text-slate-500 hover:text-indigo-400 hover:bg-slate-800 transition-all rounded-2xl w-12 h-12">
-                            <Plus className="w-7 h-7" />
-                        </Button>
-                        <input type="file" ref={fileInputRef} onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) {
-                                const reader = new FileReader();
-                                reader.onloadend = () => setImages([{ file, preview: reader.result }]);
-                                reader.readAsDataURL(file);
-                            }
-                        }} className="hidden" accept="image/*" />
-                        <Input 
-                            value={inputText}
-                            onChange={(e) => setInputText(e.target.value)}
-                            placeholder="Input formula parfum, scan stok, atau tanya keuangan..."
-                            className="bg-transparent border-none focus-visible:ring-0 text-white h-12 text-sm placeholder:text-slate-600 font-medium"
-                        />
-                        <Button type="submit" disabled={processing || (!inputText.trim() && images.length === 0)} className="bg-indigo-600 hover:bg-indigo-500 shadow-indigo-900/50 shrink-0 w-12 h-12 rounded-2xl transition-all active:scale-95">
-                            <ArrowUp className="w-6 h-6 text-white" />
-                        </Button>
+                        <Button type="button" variant="ghost" size="icon" onClick={() => fileInputRef.current?.click()} className="text-slate-500 hover:text-indigo-400 hover:bg-slate-800 transition-all rounded-2xl w-12 h-12"><Plus className="w-7 h-7" /></Button>
+                        <input type="file" ref={fileInputRef} onChange={(e) => { const file = e.target.files?.[0]; if (file) { const reader = new FileReader(); reader.onloadend = () => setImages([{ file, preview: reader.result }]); reader.readAsDataURL(file); } }} className="hidden" accept="image/*" />
+                        <Input value={inputText} onChange={(e) => setInputText(e.target.value)} placeholder="Tanya tentang modal atau input formula baru..." className="bg-transparent border-none focus-visible:ring-0 text-white h-12 text-sm placeholder:text-slate-600 font-medium" />
+                        <Button type="submit" disabled={processing || (!inputText.trim() && images.length === 0)} className="bg-indigo-600 hover:bg-indigo-500 shadow-indigo-900/50 shrink-0 w-12 h-12 rounded-2xl transition-all active:scale-95"><ArrowUp className="w-6 h-6 text-white" /></Button>
                     </div>
                 </form>
             </div>
         </div>
     );
 }
-
 export default AIStudio;
