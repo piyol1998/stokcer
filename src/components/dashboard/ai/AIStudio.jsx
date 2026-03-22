@@ -404,45 +404,65 @@ Do not use markdown inside the <RECIPE> block tags.
                 responseText = response.choices[0].message.content;
 
             } else {
-                // Gemini Fallback
+                // Gemini Fallback via Native Fetch (Bypassing v1beta SDK 404 Bugs)
                 if (!apiKey) throw new Error("API Key Gemini tidak ditemukan. Silakan atur di menu Integrasi.");
                 
                 const cleanKey = apiKey.trim();
-                const genAI = new GoogleGenerativeAI(cleanKey);
+                const apiUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${cleanKey}`;
                 
-                let result = null;
-                let lastError = null;
-                
-                let promptPayload = [];
-                const combinedText = systemPrompt + "\n\n" + (currentInput || "Tolong analisa gambar ini.");
-                promptPayload.push(combinedText);
+                const requestBody = {
+                    contents: [
+                        {
+                            role: "user",
+                            parts: [
+                                { text: systemPrompt + "\n\n" + (currentInput || "Tolong analisa ini.") }
+                            ]
+                        }
+                    ]
+                };
 
                 if (currentImage) {
-                    const imagePart = await fileToGenerativePart(currentImage);
-                    promptPayload.push(imagePart);
+                    const base64Data = await fileToBase64(currentImage);
+                    const b64Parts = base64Data.split(',');
+                    const mimeType = b64Parts[0].match(/:(.*?);/)[1];
+                    const data = b64Parts[1];
+                    
+                    requestBody.contents[0].parts.push({
+                        inlineData: { mimeType, data }
+                    });
                 }
 
-                const modelsToTry = currentImage 
-                    ? ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-1.5-flash-latest", "gemini-1.5-pro-latest", "gemini-1.0-pro-vision-latest", "gemini-pro-vision"]
-                    : ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-pro", "gemini-1.0-pro-latest", "gemini-1.5-flash-8b"];
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(requestBody)
+                });
 
-                for (const modelName of modelsToTry) {
-                    try {
-                        const model = genAI.getGenerativeModel({ model: modelName });
-                        result = await model.generateContent(promptPayload);
-                        break; 
-                    } catch (err) {
-                        lastError = err;
-                        if (!err.message.includes('404')) {
-                            throw err; 
+                if (!response.ok) {
+                    const errorJson = await response.json().catch(() => ({}));
+                    const errMsg = errorJson.error?.message || response.statusText;
+                    
+                    // Specific fallback to gemini-pro if flash fails
+                    if (response.status === 404 && !currentImage) {
+                        const fallbackUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key=${cleanKey}`;
+                        const fbRes = await fetch(fallbackUrl, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(requestBody)
+                        });
+                        if (fbRes.ok) {
+                            const fbData = await fbRes.json();
+                            responseText = fbData.candidates[0]?.content?.parts[0]?.text || "Gagal mendapatkan respon (Empty).";
+                        } else {
+                            throw new Error(`Google API (Fallback): ${fbRes.status} Error`);
                         }
+                    } else {
+                        throw new Error(`Google API: ${errMsg} (Status: ${response.status})`);
                     }
+                } else {
+                    const data = await response.json();
+                    responseText = data.candidates[0]?.content?.parts[0]?.text || "Gagal mendapatkan respon.";
                 }
-
-                if (!result) {
-                    throw lastError || new Error(`Gagal menghubungi model Gemini. Pastikan API key Anda valid.`);
-                }
-                responseText = result.response.text();
             }
 
             // Parse response for <RECIPE> tag
