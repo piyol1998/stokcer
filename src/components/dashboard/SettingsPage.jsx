@@ -7,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/SupabaseAuthContext';
 import { useToast } from '@/components/ui/use-toast';
 import { useSubscription } from '@/hooks/useSubscription';
-import { Store, Globe, User, CreditCard, Zap, BadgeCheck, AlertTriangle, Trash2, Users, Ticket, Loader2 } from 'lucide-react';
+import { Store, Globe, User, CreditCard, Zap, BadgeCheck, AlertTriangle, Trash2, Users, Ticket, Loader2, Bell, Send } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from '@/components/ui/dialog';
 import { supabase } from '@/lib/customSupabaseClient';
@@ -34,15 +34,68 @@ function SettingsPage() {
       phone: '',
       currency: 'IDR',
       osSyncEnabled: true,
-      osAutoSyncInterval: 5
+      osAutoSyncInterval: 5,
+      telegramChatId: ''
   });
+
+  // Fetch current profile data
+  React.useEffect(() => {
+    if (user) {
+        supabase.from('profiles').select('telegram_chat_id, business_name, address, phone')
+            .eq('id', user.id).maybeSingle()
+            .then(({ data }) => {
+                if (data) {
+                    setFormData(prev => ({
+                        ...prev,
+                        businessName: data.business_name || prev.businessName,
+                        address: data.address || '',
+                        phone: data.phone || '',
+                        telegramChatId: data.telegram_chat_id || ''
+                    }));
+                }
+            });
+    }
+  }, [user]);
 
   const handleSave = async (e) => {
       e.preventDefault();
       setLoading(true);
-      await new Promise(r => setTimeout(r, 800));
-      toast({ title: "Settings Saved", description: "Your business configuration has been updated." });
-      setLoading(false);
+      
+      try {
+          const { error } = await supabase.from('profiles').update({
+              business_name: formData.businessName,
+              address: formData.address,
+              phone: formData.phone,
+              telegram_chat_id: formData.telegramChatId
+          }).eq('id', user.id);
+
+          if (error) throw error;
+          toast({ title: "Settings Saved", description: "Your business configuration has been updated." });
+      } catch (err) {
+          toast({ title: "Error", description: err.message, variant: "destructive" });
+      } finally {
+          setLoading(false);
+      }
+  };
+
+  const handleTestNotification = async () => {
+    if (!formData.telegramChatId) {
+        toast({ title: "Chat ID Kosong", description: "Silakan masukkan Chat ID Telegram Anda terlebih dahulu.", variant: "destructive" });
+        return;
+    }
+
+    try {
+        const { error } = await supabase.functions.invoke('send-telegram-notification', {
+            body: { 
+                chatId: formData.telegramChatId, 
+                message: "✅ Halo Owner! Ini adalah pesan uji coba dari sistem Stokcer. Telegram Anda sudah berhasil tersambung!" 
+            }
+        });
+        if (error) throw error;
+        toast({ title: "Berhasil Terkirim", description: "Pesan uji coba telah dikirim ke Telegram Anda." });
+    } catch (err) {
+        toast({ title: "Gagal Mengirim", description: "Pastikan Chat ID benar dan Anda sudah memulai chat ke bot.", variant: "destructive" });
+    }
   };
 
   const handleJoinTeam = () => {
@@ -178,6 +231,7 @@ function SettingsPage() {
                  <TabsTrigger value="subscription" className="data-[state=active]:bg-indigo-600 text-slate-400 data-[state=active]:text-white"><CreditCard className="w-4 h-4 mr-2" /> Subscription</TabsTrigger>
                )}
                <TabsTrigger value="online-store" className="data-[state=active]:bg-indigo-600 text-slate-400 data-[state=active]:text-white"><Globe className="w-4 h-4 mr-2" /> Online Store</TabsTrigger>
+               <TabsTrigger value="notifications" className="data-[state=active]:bg-indigo-600 text-slate-400 data-[state=active]:text-white"><Bell className="w-4 h-4 mr-2" /> Notifications</TabsTrigger>
                <TabsTrigger value="account" className="data-[state=active]:bg-indigo-600 text-slate-400 data-[state=active]:text-white"><User className="w-4 h-4 mr-2" /> Account</TabsTrigger>
            </TabsList>
 
@@ -224,15 +278,56 @@ function SettingsPage() {
              </TabsContent>
            )}
 
-           {/* ... rest of tabs ... */}
            <TabsContent value="online-store" className="space-y-6">
-               <div className="bg-[#1e293b] p-6 rounded-xl border border-slate-700">
-                   <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2"><Globe className="w-5 h-5 text-indigo-400" /> Online Store Integration</h2>
-                   <div className="p-4 bg-indigo-900/20 border border-indigo-500/20 rounded-lg">
-                       <p className="text-sm text-indigo-300">Automatic sync allows you to manage inventory in one place.</p>
-                   </div>
-               </div>
-           </TabsContent>
+                <div className="bg-[#1e293b] p-6 rounded-xl border border-slate-700">
+                    <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2"><Globe className="w-5 h-5 text-indigo-400" /> Online Store Integration</h2>
+                    <div className="p-4 bg-indigo-900/20 border border-indigo-500/20 rounded-lg">
+                        <p className="text-sm text-indigo-300">Automatic sync allows you to manage inventory in one place.</p>
+                    </div>
+                </div>
+            </TabsContent>
+
+            <TabsContent value="notifications" className="space-y-6">
+                <div className="bg-[#1e293b] p-6 rounded-xl border border-slate-700">
+                    <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2"><Bell className="w-5 h-5 text-indigo-400" /> Telegram Notifications</h2>
+                    <div className="space-y-6">
+                        <div className="p-4 bg-slate-900/50 rounded-lg border border-slate-700/50 space-y-4">
+                            <h3 className="text-sm font-semibold text-slate-200">Hubungkan Telegram Owner</h3>
+                            <p className="text-xs text-slate-400 leading-relaxed">
+                                Dapatkan laporan harian, peringatan stok rendah, dan notifikasi transaksi langsung di Telegram Anda. 
+                                Setiap owner bisa menyambungkan Chat ID mereka masing-masing.
+                            </p>
+                            
+                            <div className="space-y-4 pt-2">
+                                <div className="space-y-2">
+                                    <Label className="text-white text-xs">Telegram Chat ID</Label>
+                                    <div className="flex gap-2">
+                                        <Input 
+                                            placeholder="Masukkan Chat ID (Contoh: 12345678)" 
+                                            className="bg-slate-800 border-slate-600 text-white font-mono"
+                                            value={formData.telegramChatId}
+                                            onChange={e => setFormData({...formData, telegramChatId: e.target.value})}
+                                        />
+                                        <Button onClick={handleTestNotification} variant="outline" className="border-indigo-500/30 text-indigo-400 hover:bg-indigo-500/10">
+                                            <Send className="w-4 h-4 mr-2" /> Test
+                                        </Button>
+                                    </div>
+                                </div>
+
+                                <div className="p-3 bg-indigo-900/10 border border-indigo-500/10 rounded-lg">
+                                    <h4 className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider mb-1">Cara mendapatkan Chat ID:</h4>
+                                    <ol className="text-[11px] text-slate-400 list-decimal list-inside space-y-1">
+                                        <li>Buka Telegram dan cari bot: <span className="text-indigo-300 font-bold">@StokcerBot</span></li>
+                                        <li>Tekan Tombol <span className="font-bold">START</span> atau ketik <span className="font-bold">/myid</span></li>
+                                        <li>Salin angka ID yang diberikan oleh bot</li>
+                                        <li>Tempel angka tersebut pada kotak di atas lalu klik <span className="font-bold">Save Changes</span></li>
+                                    </ol>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </TabsContent>
 
            <TabsContent value="account" className="space-y-6">
                {!isStaff && (
@@ -258,7 +353,7 @@ function SettingsPage() {
                            </div>
                            
                            <Button onClick={handleJoinTeam} className="bg-indigo-600 hover:bg-indigo-500 text-white whitespace-nowrap">
-                               Gunakan Kode
+                               Gunankan Kode
                            </Button>
 
                            <Dialog open={showJoinConfirm} onOpenChange={setShowJoinConfirm}>
