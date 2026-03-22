@@ -5,7 +5,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.0'
 const TELEGRAM_TOKEN = "8714895102:AAHNzdxP0Z1TXKBo5BnLmhZLQTawpvMU9MA"
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ""
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ""
-const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY') || Deno.env.get('DEEPSEEK_API_KEY') || ""; // Gunakan Gemini sebagai default
+const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY') || "";
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
@@ -25,32 +25,29 @@ serve(async (req) => {
     const body = JSON.parse(rawBody)
     console.log("LOG: Menerima request body:", rawBody)
 
-    // Handle Telegram Webhook (Incoming)
+    // HANDLE INCOMING MESSAGES (WEBHOOK)
     if (body.message && body.message.chat) {
-      const chatId = body.message.chat.id
+      const incomingChatId = body.message.chat.id
       const text = body.message.text
       const firstName = body.message.from?.first_name || "Owner"
-
-      console.log(`LOG: Pesan masuk dari ${firstName} (${chatId}): ${text}`)
 
       if (text === '/start' || text === '/myid') {
          await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            chat_id: chatId,
-            text: `👋 Halo ${firstName}! ID Telegram Anda adalah:\n\n<code>${chatId}</code>\n\nSalin ID di atas dan masukkan ke pengaturan Stokcer Anda agar saya bisa mengenali bisnis Anda.`,
+            chat_id: incomingChatId,
+            text: `👋 Halo ${firstName}! ID Telegram Anda adalah: <code>${incomingChatId}</code>\n\nMasukkan ID ini di menu Settings website agar saya bisa membaca data bisnis Anda.`,
             parse_mode: "HTML"
           }),
         })
         return new Response('ok', { status: 200 })
       }
 
-      // INTEGRASI OTAK AI (AI STRATEGIST)
-      // 1. Cari profil berdasarkan chatId
+      // INTEGRASI AI STRATEGIST
       const { data: profile } = await supabase.from('profiles')
         .select('*')
-        .eq('telegram_chat_id', chatId.toString())
+        .eq('telegram_chat_id', incomingChatId.toString())
         .maybeSingle()
 
       if (!profile) {
@@ -58,147 +55,106 @@ serve(async (req) => {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            chat_id: chatId,
-            text: `⚠️ Maaf ${firstName}, saya belum bisa mengenali bisnis Anda. Silakan masukkan ID <code>${chatId}</code> di menu Settings website Stokcer terlebih dahulu ya!`,
+            chat_id: incomingChatId,
+            text: `⚠️ Maaf, saya belum mengenali Anda. Tambahkan ID <code>${incomingChatId}</code> ke Settings website dulu ya!`,
             parse_mode: "HTML"
           }),
         })
         return new Response('ok', { status: 200 })
       }
 
-      // 2. Jika profil ditemukan, ambil data bisnis (Stocks, Raw Materials, History)
       const userId = profile.id
-      const [stocks, rawMaterials, history, employees] = await Promise.all([
+      const [stocks, materials, history, employees, settingsRes] = await Promise.all([
         supabase.from('stocks').select('*').eq('user_id', userId),
         supabase.from('raw_materials').select('*').eq('user_id', userId),
-        supabase.from('production_history').select('*').eq('user_id', userId).order('created_at', { ascending: false }).limit(10),
-        supabase.from('employees').select('name, role').eq('owner_id', userId)
+        supabase.from('production_history').select('*').eq('user_id', userId).order('created_at', { ascending: false }).limit(5),
+        supabase.from('employees').select('name, role').eq('owner_id', userId),
+        supabase.from('user_settings').select('marketplace_creds').eq('user_id', userId).single()
       ])
 
-      // 3. Ambil API Key dari user_settings (sama seperti di website)
-      const { data: settings } = await supabase.from('user_settings')
-        .select('marketplace_creds')
-        .eq('user_id', userId)
-        .single()
+      const aiCreds = settingsRes.data?.marketplace_creds?.ai || {}
+      const aiProvider = aiCreds.provider || 'gemini'
       
-      const aiCreds = settings?.marketplace_creds?.ai || {}
-      const activeApiKey = aiCreds.gemini_api_key || aiCreds.openai_api_key || aiCreds.deepseek_api_key || GEMINI_API_KEY
-
-      if (!activeApiKey) {
-        await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            chat_id: chatId,
-            text: `⚠️ Halo ${firstName}, saya belum menemukan kunci API AI di pengaturan Anda. Silakan atur di menu Integrasi website Stokcer ya!`,
-            parse_mode: "HTML"
-          }),
-        })
-        return new Response('ok', { status: 200 })
-      }
-
       const context = `
       Anda adalah AI Strategist Bisnis untuk ${profile.business_name}.
-      Pemilik: ${profile.business_name} (ID: ${chatId})
-      Data Bisnis Saat Ini:
-      - Stok Produk Jadi: ${JSON.stringify(stocks.data || [])}
-      - Stok Bahan Baku: ${JSON.stringify(rawMaterials.data || [])}
-      - Riwayat Produksi Terakhir: ${JSON.stringify(history.data || [])}
-      - Tim/Karyawan: ${JSON.stringify(employees.data || [])}
-
-      Tugas: Jawab pertanyaan owner dengan cerdas, ramah, dan solutif di Telegram. 
-      Berikan data yang akurat jika ditanya stok atau penjualan. 
-      Format jawaban gunakan Markdown atau HTML agar rapi di Telegram.
+      Data Bisnis:
+      - Stok Produk: ${JSON.stringify(stocks.data || [])}
+      - Bahan Baku: ${JSON.stringify(materials.data || [])}
+      - Tim: ${JSON.stringify(employees.data || [])}
+      
+      Tugas: Jawab pertanyaan dengan data di atas secara cerdas & singkat. Gunakan Markdown.
       `
 
-      // 4. Panggil AI Engine (Gemini)
+      let replyText = ""
       try {
-        console.log(`LOG: Mengirim permintaan ke Gemini menggunakan model flash-stable...`)
-        const aiResponse = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${activeApiKey}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: `${context}\n\nPertanyaan Owner: ${text}` }] }]
-          })
-        })
-        
-        const aiData = await aiResponse.json()
-        console.log("LOG: Jawaban mentah Gemini:", JSON.stringify(aiData))
+        if (aiProvider === 'openai' || aiProvider === 'deepseek') {
+          const isDeep = aiProvider === 'deepseek'
+          const apiKey = isDeep ? aiCreds.deepseek_api_key : aiCreds.openai_api_key
+          const baseURL = isDeep ? 'https://api.deepseek.com' : 'https://api.openai.com/v1'
+          
+          if (!apiKey) throw new Error(`${aiProvider.toUpperCase()} API Key belum diatur.`)
 
-        // CEK KANDIDAT JAWABAN
-        let replyText = aiData?.candidates?.[0]?.content?.parts?.[0]?.text
-        
-        // JIKA GAGAL KARENA API ERROR
-        if (!replyText && aiData.error) {
-           replyText = `❌ AI Error: ${aiData.error.message || "Gagal memproses data"}. Pastikan API Key di menu Integrasi Anda benar.`
-        } else if (!replyText) {
-           replyText = "Maaf, otak AI saya sedang istirahat sejenak (Jawaban Kosong). Bisa coba lagi nanti?"
+          const aiRes = await fetch(`${baseURL}/chat/completions`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+            body: JSON.stringify({
+              model: isDeep ? 'deepseek-chat' : 'gpt-4o-mini',
+              messages: [{ role: 'system', content: context }, { role: 'user', content: text }]
+            })
+          })
+          const aiData = await aiRes.json()
+          replyText = aiData?.choices?.[0]?.message?.content || "Gagal mendapatkan respon AI."
+        } else {
+          const apiKey = aiCreds.gemini_api_key || GEMINI_API_KEY
+          const models = ["gemini-1.5-flash", "gemini-1.5-flash-8b", "gemini-pro"]
+          for (const mId of models) {
+            const res = await fetch(`https://generativelanguage.googleapis.com/v1/models/${mId}:generateContent?key=${apiKey}`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ contents: [{ parts: [{ text: `${context}\n\nOwner: ${text}` }] }] })
+            })
+            const data = await res.json()
+            if (data?.candidates?.[0]?.content?.parts?.[0]?.text) {
+              replyText = data.candidates[0].content.parts[0].text
+              break
+            }
+          }
         }
 
-        // 5. Kirim balasan ke Telegram
         await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            chat_id: chatId,
-            text: replyText,
-            parse_mode: "Markdown"
-          }),
+          body: JSON.stringify({ chat_id: incomingChatId, text: replyText || "AI sedang sibuk.", parse_mode: "Markdown" }),
         })
       } catch (err) {
-        console.error("AI Error:", err)
         await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ chat_id: chatId, text: "❌ Terjadi kesalahan saat memproses jawaban AI." }),
+          body: JSON.stringify({ chat_id: incomingChatId, text: `❌ Error: ${err.message}` }),
         })
       }
-
-      return new Response(JSON.stringify({ ok: true }), { status: 200 })
+      return new Response('ok', { status: 200 })
     }
 
-    // Handle App Notification (Outgoing)
-    const chatId = body.chatId || body.chat_id
+    // HANDLE OUTGOING NOTIFICATIONS
+    const targetChatId = body.chatId || body.chat_id
     const message = body.message
 
-    if (chatId && message) {
-      // FORCE PARSE TO INTEGER if needed
-      const cleanChatId = typeof chatId === 'string' ? parseInt(chatId, 10) : chatId
-      
-      console.log(`LOG: Mengirim notifikasi ke ID ${cleanChatId}`)
-      
-      const tgResponse = await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
+    if (targetChatId && message) {
+      const cleanId = typeof targetChatId === 'string' ? parseInt(targetChatId, 10) : targetChatId
+      const res = await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          chat_id: cleanChatId,
-          text: message,
-          parse_mode: "HTML"
-        }),
+        body: JSON.stringify({ chat_id: cleanId, text: message, parse_mode: "HTML" }),
       })
-      
-      const tgResult = await tgResponse.json()
-      console.log("LOG: Hasil dari Telegram:", JSON.stringify(tgResult))
-      
-      return new Response(JSON.stringify(tgResult), {
-        status: tgResponse.status,
-        headers: { 
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*'
-        }
-      })
+      const result = await res.json()
+      return new Response(JSON.stringify(result), { status: 200, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } })
     }
 
-    return new Response(JSON.stringify({ error: "No chatId or message provided" }), { 
-        status: 400,
-        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
-    })
+    return new Response(JSON.stringify({ error: "Missing data" }), { status: 400 })
 
   } catch (error) {
-    console.error("LOG ERROR:", error.message)
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
-    })
+    console.error("ERROR:", error.message)
+    return new Response(JSON.stringify({ error: error.message }), { status: 400 })
   }
 })
