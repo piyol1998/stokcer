@@ -45,7 +45,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import OpenAI from "openai";
 
-const RecipeBlock = ({ data, allIngredients, onAddIngredient }) => {
+const RecipeBlock = ({ data, allIngredients, onAddIngredient, onNavigate }) => {
     const [missingCategories, setMissingCategories] = useState({});
 
     const detectedIngredients = data.components.map(c => c.name);
@@ -116,7 +116,14 @@ const RecipeBlock = ({ data, allIngredients, onAddIngredient }) => {
                                 <CardTitle className="text-base text-slate-200">{data.title}</CardTitle>
                             </div>
                         </div>
-                        <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700 h-8 text-xs text-slate-100">
+                        <Button 
+                            size="sm" 
+                            className="bg-indigo-600 hover:bg-indigo-700 h-8 text-xs text-slate-100"
+                            onClick={() => {
+                                sessionStorage.setItem('pendingAiRecipe', JSON.stringify(data));
+                                if (onNavigate) onNavigate('recipes');
+                            }}
+                        >
                             <Check className="w-3 h-3 mr-1" />
                             Simpan Formula
                         </Button>
@@ -164,7 +171,7 @@ const RecipeBlock = ({ data, allIngredients, onAddIngredient }) => {
     );
 };
 
-function AIStudio() {
+function AIStudio({ onNavigate }) {
     const { ownerId } = useAuth();
     const { toast } = useToast();
     
@@ -594,6 +601,7 @@ Do not use markdown inside the <RECIPE> block tags.
                                         data={msg.recipeData} 
                                         allIngredients={allIngredients} 
                                         onAddIngredient={addIngredient} 
+                                        onNavigate={onNavigate}
                                     />
                                 )}
                             </div>

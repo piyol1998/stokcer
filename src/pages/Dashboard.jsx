@@ -64,7 +64,7 @@ function Dashboard() {
         case 'ai-ads':
           return <AiAdvertising />;
         case 'ai-studio':
-          return <AIStudio />;
+          return <AIStudio onNavigate={goToInventory} />;
         case 'marketplace':
           return <MarketplaceIntegration />;
         case 'settings':

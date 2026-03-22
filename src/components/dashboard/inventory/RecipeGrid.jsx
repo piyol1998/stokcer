@@ -285,7 +285,36 @@ function RecipeGrid({ onUpdate }) {
     }, [rawMaterials]);
 
     useEffect(() => {
-        if (user) fetchData();
+        if (user) {
+            fetchData().then((fetchedMaterials) => {
+                const pendingAiRecipe = sessionStorage.getItem('pendingAiRecipe');
+                if (pendingAiRecipe) {
+                    sessionStorage.removeItem('pendingAiRecipe');
+                    try {
+                        const aiData = JSON.parse(pendingAiRecipe);
+                        handleOpenDialog(null);
+
+                        setGeneralInfo({ name: aiData.title || '', description: 'Hasil deteksi AI Studio Stokcer' });
+                        
+                        const mappedMaterials = (aiData.components || []).map(comp => {
+                            const match = (fetchedMaterials || []).find(m => m.name.toLowerCase().trim() === comp.name?.toLowerCase().trim());
+                            return {
+                                id: match ? match.id : '',
+                                percent_share: comp.percentage || 0
+                            };
+                        });
+
+                        setWizardData({
+                            sections: [
+                                { id: `sec-${Date.now()}`, name: 'Bibit', percent: 100, type: 'multi', materials: mappedMaterials }
+                            ],
+                            additionalMaterials: []
+                        });
+                        setActiveTab("wizard");
+                    } catch(e) { console.error('AI load error', e); }
+                }
+            });
+        }
     }, [user]);
 
     const fetchData = async () => {
@@ -311,9 +340,11 @@ function RecipeGrid({ onUpdate }) {
             if (recipeError) throw recipeError;
             setRecipes(recipeData || []);
 
+            return materials || [];
         } catch (error) {
             console.error("Fetch Error:", error);
             toast({ title: "Error", description: "Gagal memuat data resep", variant: "destructive" });
+            return [];
         } finally {
             setLoading(false);
         }
