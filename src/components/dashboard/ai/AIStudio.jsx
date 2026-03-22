@@ -16,9 +16,7 @@ import {
     FlaskConical,
     Loader2,
     TrendingUp,
-    Save,
-    ChevronRight,
-    Search
+    Save
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -33,39 +31,69 @@ import {
 } from "@/components/ui/select";
 import OpenAI from "openai";
 
+// Perfumery Synonym Map
+const SYNONYMS = {
+    'ambroxan': ['ambroxide', 'cetalox', 'ambrofix', 'ambrox'],
+    'galaxolide': ['abbalide', 'musk 50'],
+    'hedione': ['methyl dihydrojasmonate', 'khariane'],
+    'iso e super': ['sylvamber', 'timbersilk', 'iso e'],
+    'ethylene brassylate': ['musk t', 'astratone'],
+    'habanolide': ['globalide'],
+    'musk ketone': ['mk'],
+    'lilial': ['lysaldehyde', 'butylphenyl methylpropional']
+};
+
+const isSimilar = (name1, name2) => {
+    const n1 = name1.toLowerCase().trim();
+    const n2 = name2.toLowerCase().trim();
+    
+    // Exact match
+    if (n1 === n2) return true;
+    
+    // Partial Match (e.g. "Bergamot" in "Bergamot Accord")
+    const cleanN1 = n1.replace(/[^a-z0-9]/g, '');
+    const cleanN2 = n2.replace(/[^a-z0-9]/g, '');
+    if (cleanN1.includes(cleanN2) || cleanN2.includes(cleanN1)) return true;
+
+    // Synonym Match
+    for (const [key, aliases] of Object.entries(SYNONYMS)) {
+        const isN1Match = n1.includes(key) || aliases.some(a => n1.includes(a));
+        const isN2Match = n2.includes(key) || aliases.some(a => n2.includes(a));
+        if (isN1Match && isN2Match) return true;
+    }
+
+    return false;
+};
+
 const RecipeBlock = ({ data, allIngredients, onAddIngredient, onNavigate }) => {
     const [missingCategories, setMissingCategories] = useState({});
     
     if (!data || !data.components) return null;
 
-    const detectedIngredients = data.components.map(c => c.name);
-    const missing = detectedIngredients.filter(name => {
-        const cleanName = name.toLowerCase().trim();
-        return !allIngredients.some(item => {
-            const n1 = item.name.toLowerCase().replace(/\s+/g, '');
-            const n2 = cleanName.replace(/\s+/g, '');
-            return n1.includes(n2) || n2.includes(n1);
-        });
+    const missing = data.components.filter(comp => {
+        return !allIngredients.some(item => isSimilar(item.name, comp.name));
     });
 
     return (
         <div className="space-y-5 my-4 w-full max-w-4xl animate-in fade-in slide-in-from-top-4 duration-500">
-            {/* 1. SECTION: PENGECEKAN BAHAN GUDANG */}
             {missing.length > 0 && (
                 <Card className="border-amber-500/30 bg-amber-500/5 backdrop-blur-md border-2 overflow-hidden shadow-2xl">
                     <div className="bg-amber-600/20 px-6 py-3 border-b border-amber-500/20 flex items-center justify-between">
                         <div className="flex items-center gap-2">
                             <AlertTriangle className="w-5 h-5 text-amber-500" />
-                            <h3 className="text-xs font-black text-amber-500 uppercase tracking-widest">Peringatan: {missing.length} Bahan Belum Terdaftar</h3>
+                            <h3 className="text-xs font-black text-amber-500 uppercase tracking-widest">Peringatan: {missing.length} Bahan Belum Terdeteksi di Gudang</h3>
                         </div>
                     </div>
                     <CardContent className="p-0">
                         <div className="divide-y divide-white/5">
-                            {missing.map((name, idx) => (
+                            {missing.map((comp, idx) => (
                                 <div key={idx} className="px-6 py-4 flex items-center justify-between bg-slate-900/40 hover:bg-slate-900/60 transition-colors">
-                                    <span className="text-sm font-bold text-slate-200">{name}</span>
+                                    <div className="flex flex-col">
+                                        <span className="text-sm font-bold text-slate-200">{comp.name}</span>
+                                        <span className="text-[10px] text-slate-500 uppercase font-black tracking-tighter mt-1">Kategori AI: {comp.category}</span>
+                                    </div>
                                     <div className="flex items-center gap-3">
-                                        <Select value={missingCategories[name] || "Material sintetik"} onValueChange={(v) => setMissingCategories(p => ({...p, [name]: v}))}>
+                                        <Select value={missingCategories[comp.name] || comp.category || "Material sintetik"} onValueChange={(v) => setMissingCategories(p => ({...p, [comp.name]: v}))}>
                                             <SelectTrigger className="w-36 h-9 text-[10px] bg-slate-950 border-slate-700 font-bold uppercase">
                                                 <SelectValue />
                                             </SelectTrigger>
@@ -75,7 +103,7 @@ const RecipeBlock = ({ data, allIngredients, onAddIngredient, onNavigate }) => {
                                                 <SelectItem value="Material sintetik">Material Sintetik</SelectItem>
                                             </SelectContent>
                                         </Select>
-                                        <Button size="sm" className="bg-amber-600 hover:bg-amber-500 h-9 px-6 text-[10px] font-black tracking-widest transition-transform active:scale-90" onClick={() => onAddIngredient(name, missingCategories[name] || "Material sintetik")}>
+                                        <Button size="sm" className="bg-amber-600 hover:bg-amber-500 h-9 px-6 text-[10px] font-black tracking-widest transition-transform active:scale-90 shadow-lg shadow-amber-900/20" onClick={() => onAddIngredient(comp.name, missingCategories[comp.name] || comp.category || "Material sintetik")}>
                                             <Plus className="w-4 h-4 mr-1.5" /> + INPUT
                                         </Button>
                                     </div>
@@ -86,7 +114,6 @@ const RecipeBlock = ({ data, allIngredients, onAddIngredient, onNavigate }) => {
                 </Card>
             )}
 
-            {/* 2. SECTION: TABEL FORMULA LENGKAP */}
             <Card className="bg-[#0f172a]/90 border-slate-700 shadow-[0_32px_64px_-12px_rgba(0,0,0,0.8)] overflow-hidden backdrop-blur-2xl ring-1 ring-white/10">
                 <CardHeader className="p-6 border-b border-white/5 bg-gradient-to-r from-indigo-600/10 to-transparent flex flex-row items-center justify-between">
                     <div className="flex items-center gap-4">
@@ -95,12 +122,12 @@ const RecipeBlock = ({ data, allIngredients, onAddIngredient, onNavigate }) => {
                         </div>
                         <div>
                             <CardTitle className="text-lg font-black text-white tracking-tight uppercase">Resep Parfum Terdeteksi</CardTitle>
-                            <CardDescription className="text-xs text-slate-400 font-medium">Lengkap dengan persentase & kategori</CardDescription>
+                            <CardDescription className="text-xs text-slate-400 font-medium tracking-tight">Status sinkronisasi real-time dengan stok Anda</CardDescription>
                         </div>
                     </div>
                     <Button 
                         size="sm" 
-                        className="bg-[#4143e2] hover:bg-[#4143e2]/90 text-[11px] font-black h-10 px-6 tracking-widest rounded-xl shadow-xl shadow-indigo-900/40" 
+                        className="bg-[#4143e2] hover:bg-[#4143e2]/90 text-[11px] font-black h-10 px-6 tracking-widest rounded-xl shadow-xl shadow-indigo-900/40 border border-indigo-500/50" 
                         onClick={() => {
                              sessionStorage.setItem('pendingAiRecipe', JSON.stringify(data));
                              if (onNavigate) onNavigate('recipes');
@@ -118,41 +145,42 @@ const RecipeBlock = ({ data, allIngredients, onAddIngredient, onNavigate }) => {
                                     <th className="px-6 py-5">%</th>
                                     <th className="px-6 py-5">Kategori</th>
                                     <th className="px-6 py-5">Note</th>
-                                    <th className="px-6 py-5 text-right">Status</th>
+                                    <th className="px-6 py-5 text-right">Status Gudang</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-white/5">
                                 {data.components.map((comp, idx) => {
-                                    const match = allIngredients.find(i => {
-                                        const n1 = i.name.toLowerCase().replace(/\s+/g, '');
-                                        const n2 = comp.name.toLowerCase().replace(/\s+/g, '');
-                                        return n1.includes(n2) || n2.includes(n1);
-                                    });
+                                    const match = allIngredients.find(i => isSimilar(i.name, comp.name));
                                     return (
-                                        <tr key={idx} className="group hover:bg-white/[0.03] transition-colors">
+                                        <tr key={idx} className="group hover:bg-white/[0.03] transition-all duration-200">
                                             <td className="px-6 py-5">
-                                                <span className="text-slate-200 font-bold text-sm tracking-tight">{comp.name}</span>
+                                                <div className="flex flex-col">
+                                                    <span className="text-slate-200 font-bold text-sm tracking-tight">{comp.name}</span>
+                                                    {match && match.name.toLowerCase() !== comp.name.toLowerCase() && (
+                                                        <span className="text-[9px] text-indigo-400 font-black tracking-widest uppercase mt-1">Stok: {match.name}</span>
+                                                    )}
+                                                </div>
                                             </td>
                                             <td className="px-6 py-5">
-                                                <span className="text-indigo-400 font-mono font-black text-sm">
+                                                <span className="text-indigo-400 font-mono font-black text-sm bg-indigo-500/5 px-2 py-1 rounded border border-indigo-500/10">
                                                     {comp.percentage}%
                                                 </span>
                                             </td>
-                                            <td className="px-6 py-5 text-slate-400 font-bold uppercase text-[10px] tracking-wider">
+                                            <td className="px-6 py-5 text-slate-400 font-black uppercase text-[10px] tracking-widest">
                                                 {comp.category || (match ? match.category : 'MATERIAL SINTETIK')}
                                             </td>
                                             <td className="px-6 py-5">
-                                                <Badge className="bg-slate-800 text-slate-400 border-none font-bold uppercase text-[9px] px-2 h-5">
-                                                    {comp.note || 'Middle Note'}
+                                                <Badge className="bg-slate-800/80 text-slate-400 border border-white/5 font-black uppercase text-[9px] px-2 h-6 tracking-widest">
+                                                    {comp.note || 'Heart Note'}
                                                 </Badge>
                                             </td>
                                             <td className="px-6 py-5 text-right">
                                                 {match ? 
-                                                    <span className="text-emerald-500 font-bold flex items-center justify-end gap-1.5 text-[10px] uppercase">
-                                                        <Check className="w-3.5 h-3.5" /> Ready
+                                                    <span className="text-emerald-500 font-black flex items-center justify-end gap-2 text-[10px] uppercase tracking-widest">
+                                                        <Check className="w-4 h-4 bg-emerald-500/10 p-0.5 rounded-full" /> Ready
                                                     </span> : 
-                                                    <span className="text-rose-500 font-bold flex items-center justify-end gap-1.5 text-[10px] uppercase">
-                                                        <X className="w-3.5 h-3.5" /> Missing
+                                                    <span className="text-rose-500 font-black flex items-center justify-end gap-2 text-[10px] uppercase tracking-widest">
+                                                        <X className="w-4 h-4 bg-rose-500/10 p-0.5 rounded-full" /> Missing
                                                     </span>
                                                 }
                                             </td>
@@ -177,7 +205,7 @@ const InventoryCheckBlock = ({ data, allIngredients, onAddIngredient, onDeleteIn
                     <div className="w-9 h-9 rounded-xl bg-emerald-500/20 flex items-center justify-center border border-emerald-500/30 text-emerald-400">
                         <Database className="w-5 h-5" />
                     </div>
-                    <CardTitle className="text-sm font-black text-slate-200 uppercase tracking-widest">Detail Scan Inventaris</CardTitle>
+                    <CardTitle className="text-sm font-black text-slate-200 uppercase tracking-widest">Hasil Scan Inventaris</CardTitle>
                 </div>
             </CardHeader>
             <CardContent className="p-0">
@@ -191,11 +219,7 @@ const InventoryCheckBlock = ({ data, allIngredients, onAddIngredient, onDeleteIn
                     </thead>
                     <tbody className="divide-y divide-white/5">
                         {data.items.map((item, idx) => {
-                            const dbItem = allIngredients.find(i => {
-                                const n1 = i.name.toLowerCase().replace(/\s+/g, '');
-                                const n2 = item.name.toLowerCase().replace(/\s+/g, '');
-                                return n1.includes(n2) || n2.includes(n1);
-                            });
+                            const dbItem = allIngredients.find(i => isSimilar(i.name, item.name));
                             return (
                                 <tr key={idx} className="hover:bg-white/[0.03] transition-colors">
                                     <td className="px-6 py-5">
@@ -318,7 +342,7 @@ function AIStudio({ onNavigate }) {
         try {
             const { data, error } = await supabase.from('raw_materials').insert([{ user_id: ownerId, name, category, quantity: 0, unit: 'ml', price: 0, price_per_qty_amount: 1, min_stock: 10 }]).select();
             if (error) throw error;
-            toast({ title: "Berhasil Input", description: `${name} masuk database.` });
+            toast({ title: "Berhasil!", description: `${name} telah masuk ke daftar bahan baku Anda.` });
             setAllIngredients(prev => [...prev, ...data]);
         } catch (e) { toast({ title: "Gagal", description: e.message, variant: "destructive" }); }
     };
@@ -328,7 +352,7 @@ function AIStudio({ onNavigate }) {
         try {
             await supabase.from('raw_materials').update({ deleted_at: new Date().toISOString() }).eq('id', id);
             setAllIngredients(prev => prev.filter(i => i.id !== id));
-            toast({ title: "Berhasil", description: `Bahan ${name} telah dihapus.` });
+            toast({ title: "Terhapus", description: `${name} telah dikeluarkan dari gudang.` });
         } catch (e) { console.error(e); }
     };
 
@@ -340,35 +364,30 @@ function AIStudio({ onNavigate }) {
         setMessages(prev => [...prev, { id: Date.now().toString(), role: 'user', content: inputText, images: currentImages.map(img => img.preview) }]);
         setInputText(''); setImages([]); setProcessing(true);
 
-        const systemPrompt = `Anda AI Strategist Bisnis ${dbProfile?.business_name || 'Cleith'}. Indonesia.
-DATA REAL-TIME:
-- Investasi: Rp ${dbStats.totalModalDikeluarkan.toLocaleString('id-ID')}
-- Aset Bahan: Rp ${dbStats.sisaModalBahan.toLocaleString('id-ID')}
-- Produksi: Rp ${dbStats.totalProductionCost.toLocaleString('id-ID')}
-- Penjualan: Rp ${dbStats.totalSales.toLocaleString('id-ID')}
-
-TUGAS UTAMA:
-1. Jika mendeteksi formula, output harus mengandung JSON <RECIPE>{"title": "Nama", "components": [{"name": "A", "percentage": 10, "category": "Material", "note": "Top Note"}]}</RECIPE>.
-2. Deteksi mana bahan yang BELUM ada di gudang.
-3. Gunakan sapaan cerdas dan berikan laporan keuangan jika ditanya.`;
+        const systemPrompt = `Anda AI Ahli Kimia & Strategis Parfum Cleith. Bahasa: Indonesia.
+ATURAN KHUSUS:
+- Ambroxan, Ambroxide, Cetalox, Ambrofix adalah benda yang SAMA.
+- Galaxolide & Abbalide adalah SAMA.
+- Jika mendeteksi formula, wajib JSON <RECIPE>{"title": "Nama", "components": [{"name": "A", "percentage": 10, "category": "Material", "note": "Top Note"}]}</RECIPE>.
+- Berikan wawasan mendalam tentang karakter aroma jika terdeteksi formula.`;
 
         try {
             let responseText = "";
             if (aiProvider === 'openai' && openaiKey) {
                 const openai = new OpenAI({ apiKey: openaiKey.trim(), dangerouslyAllowBrowser: true });
-                const content = [{ type: "text", text: currentInput || "Analisis ini." }];
+                const content = [{ type: "text", text: currentInput || "Tolong analisis ini secara detail." }];
                 for (let i of currentImages) content.push({ type: "image_url", image_url: { url: await fileToBase64(i.file) } });
                 const res = await openai.chat.completions.create({ model: "gpt-4o-mini", messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content }] });
                 responseText = res.choices[0].message.content;
             } else if (apiKey) {
-                const body = { contents: [{ role: "user", parts: [{ text: systemPrompt + "\n\n" + (currentInput || "Analisis ini") }] }] };
+                const body = { contents: [{ role: "user", parts: [{ text: systemPrompt + "\n\n" + (currentInput || "Analisis resep parfum ini") }] }] };
                 for (let i of currentImages) {
                     const b64 = await fileToBase64(i.file);
                     body.contents[0].parts.push({ inlineData: { mimeType: "image/jpeg", data: b64.split(',')[1] } });
                 }
                 const res = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey.trim()}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
                 const data = await res.json();
-                responseText = data.candidates?.[0]?.content?.parts?.[0]?.text || "AI sedang offline.";
+                responseText = data.candidates?.[0]?.content?.parts?.[0]?.text || "AI sedang melakukan reset koneksi...";
             }
 
             const recipeRegex = /<RECIPE>([\s\S]*?)<\/RECIPE>/;
@@ -396,7 +415,7 @@ TUGAS UTAMA:
                     </div>
                     <div>
                         <h2 className="text-xl font-black text-white leading-none uppercase tracking-tight">AI Studio Stokcer</h2>
-                        <span className="text-[10px] text-indigo-500 font-black tracking-widest uppercase mt-2 block">Google Gemini Engine</span>
+                        <span className="text-[10px] text-indigo-500 font-black tracking-widest uppercase mt-2 block tracking-widest">Perfume Intelligence Deep Analysis</span>
                     </div>
                 </div>
             </header>
@@ -406,7 +425,7 @@ TUGAS UTAMA:
                     <div className="h-full flex flex-col items-center justify-center text-center p-8 max-w-lg mx-auto grayscale opacity-40">
                         <BrainCircuit className="w-20 h-20 text-indigo-500 mb-8" />
                         <h3 className="text-3xl font-black text-white uppercase tracking-tighter">Strategic Intelligence</h3>
-                        <p className="text-slate-500 mt-3 text-sm font-medium italic">Ready to analyze your perfume formula & financial data.</p>
+                        <p className="text-slate-500 mt-3 text-sm font-medium italic">Siap menganalisis modal, stok, dan rahasia aroma parfum Anda.</p>
                     </div>
                 ) : (
                     messages.map((msg) => (
@@ -417,7 +436,7 @@ TUGAS UTAMA:
                             <div className={`flex flex-col gap-4 max-w-[85%] ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
                                 {msg.images && msg.images.length > 0 && (
                                     <div className="flex flex-wrap gap-4 justify-end mb-1">
-                                        {msg.images.map((img, i) => <img key={i} src={img} className="rounded-2xl border-2 border-slate-700 max-w-[300px] shadow-3xl" alt="upload" />)}
+                                        {msg.images.map((img, i) => <img key={i} src={img} className="rounded-2xl border-2 border-slate-700 max-w-[300px] shadow-3xl grayscale hover:grayscale-0 transition-all duration-500" alt="upload" />)}
                                     </div>
                                 )}
                                 <div className={`px-6 py-4 rounded-3xl text-[14px] leading-relaxed shadow-3xl ${msg.role === 'user' ? 'bg-indigo-600 text-white rounded-tr-none' : 'bg-slate-800/90 text-slate-200 rounded-tl-none border border-white/5 backdrop-blur-md whitespace-pre-line'}`}>
@@ -431,7 +450,7 @@ TUGAS UTAMA:
                 )}
                 {processing && <div className="max-w-4xl mx-auto flex items-center gap-4 pl-20 animate-pulse text-indigo-400">
                     <Loader2 className="w-5 h-5 animate-spin" />
-                    <span className="text-[10px] font-black uppercase tracking-[0.3em]">AI Strategist is thinking...</span>
+                    <span className="text-[10px] font-black uppercase tracking-[0.3em]">AI Alchemist is analyzing...</span>
                 </div>}
                 <div ref={chatEndRef} />
             </div>
@@ -453,7 +472,7 @@ TUGAS UTAMA:
                         <Input 
                             value={inputText}
                             onChange={(e) => setInputText(e.target.value)}
-                            placeholder="Input formula atau tanya hasil laku laku hari ini..."
+                            placeholder="Input formula parfum, scan stok, atau tanya keuangan..."
                             className="bg-transparent border-none focus-visible:ring-0 text-white h-12 text-sm placeholder:text-slate-600 font-medium"
                         />
                         <Button type="submit" disabled={processing || (!inputText.trim() && images.length === 0)} className="bg-indigo-600 hover:bg-indigo-500 shadow-indigo-900/50 shrink-0 w-12 h-12 rounded-2xl transition-all active:scale-95">
