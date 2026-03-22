@@ -401,7 +401,7 @@ function AIStudio({ onNavigate }) {
         try {
             const [ingRes, stockRes] = await Promise.all([
                 supabase.from('raw_materials').select('id, name, category, quantity, unit, purchase_link').eq('user_id', ownerId).is('deleted_at', null).order('name', { ascending: true }),
-                supabase.from('stocks').select('name, quantity, status').eq('user_id', ownerId).order('name', { ascending: true })
+                supabase.from('stocks').select('id, name, quantity, selling_price').eq('user_id', ownerId).order('name', { ascending: true })
             ]);
             setAllIngredients(ingRes.data || []);
             setDbStocks(stockRes.data || []);
