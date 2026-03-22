@@ -408,7 +408,6 @@ Do not use markdown inside the <RECIPE> block tags.
                 if (!apiKey) throw new Error("API Key Gemini tidak ditemukan. Silakan atur di menu Integrasi.");
                 
                 const cleanKey = apiKey.trim();
-                const apiUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${cleanKey}`;
                 
                 const requestBody = {
                     contents: [
@@ -432,37 +431,45 @@ Do not use markdown inside the <RECIPE> block tags.
                     });
                 }
 
-                const response = await fetch(apiUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(requestBody)
-                });
+                const apiModelsToTry = currentImage 
+                    ? ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]
+                    : ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-pro"];
 
-                if (!response.ok) {
-                    const errorJson = await response.json().catch(() => ({}));
-                    const errMsg = errorJson.error?.message || response.statusText;
+                let finalResponse = null;
+                let lastFetchError = null;
+
+                for (const modelId of apiModelsToTry) {
+                    const apiUrl = `https://generativelanguage.googleapis.com/v1/models/${modelId}:generateContent?key=${cleanKey}`;
                     
-                    // Specific fallback to gemini-pro if flash fails
-                    if (response.status === 404 && !currentImage) {
-                        const fallbackUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key=${cleanKey}`;
-                        const fbRes = await fetch(fallbackUrl, {
+                    try {
+                        const tmpResponse = await fetch(apiUrl, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify(requestBody)
                         });
-                        if (fbRes.ok) {
-                            const fbData = await fbRes.json();
-                            responseText = fbData.candidates[0]?.content?.parts[0]?.text || "Gagal mendapatkan respon (Empty).";
+
+                        if (tmpResponse.ok) {
+                            finalResponse = tmpResponse;
+                            break; 
+                        } else if (tmpResponse.status === 404) {
+                            lastFetchError = new Error(`Model ${modelId} 404`);
+                            continue; // Skip and try the next legacy/newer model
                         } else {
-                            throw new Error(`Google API (Fallback): ${fbRes.status} Error`);
+                            const errorJson = await tmpResponse.json().catch(() => ({}));
+                            throw new Error(`Google API: ${errorJson.error?.message || tmpResponse.statusText} (${tmpResponse.status})`);
                         }
-                    } else {
-                        throw new Error(`Google API: ${errMsg} (Status: ${response.status})`);
+                    } catch (e) {
+                        lastFetchError = e;
+                        if (!e.message.includes('404')) throw e; // Break loop on 400, 403, CORS
                     }
-                } else {
-                    const data = await response.json();
-                    responseText = data.candidates[0]?.content?.parts[0]?.text || "Gagal mendapatkan respon.";
                 }
+
+                if (!finalResponse) {
+                    throw lastFetchError || new Error(`Seluruh generasi model Gemini tidak dikenali (404 Error). Pastikan Akun Anda mendukung API ini.`);
+                }
+
+                const data = await finalResponse.json();
+                responseText = data.candidates[0]?.content?.parts[0]?.text || "Gagal mendapatkan respon (Kosong).";
             }
 
             // Parse response for <RECIPE> tag
