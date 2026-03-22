@@ -421,24 +421,28 @@ function AIStudio({ onNavigate }) {
             const stocks = stockRes.data || [];
             const history = prodRes.data || [];
 
-            // Calculate Dashboard-like Stats
+            // 1. Hitung Nilai Aset Bahan Baku (Sisa Modal Bahan)
             let totalStockValue = 0;
             const priceMap = {};
             materials.forEach(m => {
-                const price = Number(m.price) || 0;
-                const amount = Number(m.price_per_qty_amount) || 1;
-                const pricePerUnit = price / amount;
+                const buyPrice = Number(m.price) || 0;
+                const buyQty = Number(m.price_per_qty_amount) || 1;
+                const pricePerUnit = buyPrice / buyQty;
                 priceMap[m.id] = pricePerUnit;
                 totalStockValue += (Number(m.quantity) || 0) * pricePerUnit;
             });
 
+            // 2. Hitung Total Biaya Produksi (Modal Terpakai)
             let totalProductionCost = 0;
             history.forEach(record => {
-                if (Array.isArray(record.ingredients_snapshot)) {
+                // Gunakan total_cost dari record jika ada, atau hitung dari snapshot
+                if (record.total_cost) {
+                    totalProductionCost += Number(record.total_cost);
+                } else if (Array.isArray(record.ingredients_snapshot)) {
                     record.ingredients_snapshot.forEach(ing => {
-                        const qty = Number(ing.quantity) || 0;
-                        let unitPrice = ing.pricePerUnit ? Number(ing.pricePerUnit) : (ing.materialId && priceMap[ing.materialId] ? priceMap[ing.materialId] : 0);
-                        totalProductionCost += (qty * unitPrice);
+                        const qtyUsed = Number(ing.quantity) || 0;
+                        const unitPrice = Number(ing.pricePerUnit || ing.unit_price || priceMap[ing.materialId || ing.id] || 0);
+                        totalProductionCost += (qtyUsed * unitPrice);
                     });
                 }
             });
@@ -447,10 +451,13 @@ function AIStudio({ onNavigate }) {
             setDbStocks(stocks);
             setDbProfile(profRes.data || null);
             setDbStats({
-                totalModalDikeluarkan: totalProductionCost + totalStockValue,
-                sisaModalBahan: totalStockValue,
-                totalProductionCost: totalProductionCost,
+                // Gunakan Math.round agar AI tidak bingung dengan angka desimal yang panjang
+                totalModalDikeluarkan: Math.round(totalProductionCost + totalStockValue),
+                sisaModalBahan: Math.round(totalStockValue),
+                totalProductionCost: Math.round(totalProductionCost),
                 totalBatches: history.length,
+                totalProducts: stocks.length,
+                totalMaterials: materials.length,
                 recentActivity: actRes.data || [],
                 employees: empRes.data || []
             });
@@ -589,18 +596,20 @@ Here is the EXCLUSIVE real-time business intelligence context for ${dbProfile?.b
 </BUSINESS_PROFILE>
 
 <FINANCIAL_METRICS_DASHBOARD>
-- Total Investasi (Modal Dikeluarkan): Rp ${dbStats.totalModalDikeluarkan.toLocaleString()}
-- Aset Saat Ini (Sisa Modal Bahan Baku): Rp ${dbStats.sisaModalBahan.toLocaleString()}
-- Total Modal Produksi (Terpakai): Rp ${dbStats.totalProductionCost.toLocaleString()}
+- Total Investasi (Modal Dikeluarkan): Rp ${dbStats.totalModalDikeluarkan.toLocaleString('id-ID')}
+- Aset Saat Ini (Sisa Modal Bahan Baku): Rp ${dbStats.sisaModalBahan.toLocaleString('id-ID')}
+- Total Modal Produksi (Terpakai): Rp ${dbStats.totalProductionCost.toLocaleString('id-ID')}
 - Total Batch Produksi: ${dbStats.totalBatches} batches
+- Total Jenis Produk Jadi: ${dbStats.totalProducts} jenis
+- Total Item Bahan Baku Aktif: ${dbStats.totalMaterials} item
 </FINANCIAL_METRICS_DASHBOARD>
 
 <TEAM_MANAGEMENT>
-${dbStats.employees.length > 0 ? dbStats.employees.map(e => `- ${e.name}: ${e.role} (Status: ${e.status || 'Aktif'})`).join('\n') : "Belum ada karyawan terdaftar."}
+${dbStats.employees.length > 0 ? dbStats.employees.map(e => `- ${e.name}: ${e.role} (ID: ${e.id.substring(0,5)})`).join('\n') : "Belum ada karyawan terdaftar."}
 </TEAM_MANAGEMENT>
 
 <RECENT_ACTIVITY_LOG>
-${dbStats.recentActivity.length > 0 ? dbStats.recentActivity.map(a => `- [${new Date(a.created_at).toLocaleDateString()}] ${a.title}: ${a.message}`).join('\n') : "Belum ada aktivitas tercatat."}
+${dbStats.recentActivity.length > 0 ? dbStats.recentActivity.map(a => `- [${new Date(a.created_at).toLocaleDateString('id-ID')}] ${a.title}: ${a.message}`).join('\n') : "Belum ada aktivitas tercatat."}
 </RECENT_ACTIVITY_LOG>
 
 <DATA_PRODUK_JADI>
