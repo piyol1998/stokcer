@@ -302,30 +302,87 @@ function AIStudio({ onNavigate }) {
         const currentInput = inputText;
         setMessages(prev => [...prev, { id: Date.now().toString(), role: 'user', content: inputText, images: currentImages.map(img => img.preview) }]);
         setInputText(''); setImages([]); setProcessing(true);
-        const systemPrompt = `Anda AI Ahli Kimia & Strategis Parfum Cleith. Bahasa: Indonesia.
-Daftar Kategori Anda: ${Array.from(new Set(allIngredients.map(i => i.category))).join(', ')}.
-Wajib JSON <RECIPE>{"title": "Nama", "components": [{"name": "A", "percentage": 10, "category": "Kategori Sesuai Database", "note": "Top Note"}]}</RECIPE>.`;
+
+        const categoriesStr = Array.from(new Set(allIngredients.map(i => i.category))).join(', ') || "Material sintetik";
+        const systemPrompt = `Anda adalah "Cleith AI", Ahli Kimia & Analis Strategis Parfum Premium.
+Tugas Anda: Analisis formula secara profesional, lalu berikan data terstruktur di akhir.
+
+ATURAN OUTPUT:
+1. Bicara dengan nada perfumery professional (Top, Middle, Base note analysis).
+2. Di Akhir pesan, WAJIB sertakan data JSON di dalam tag khusus.
+3. JANGAN bungkus tag <RECIPE> atau <INVENTORY> dengan markdown code blocks (seperti \`\`\`json). Langsung tulis tag-nya.
+
+WAJIB GUNAKAN DAFTAR KATEGORI DATABASE INI: [ ${categoriesStr} ]
+
+FORMAT DATA (TARUH DI BAGIAN PALING BAWAH):
+<RECIPE>
+{
+  "title": "Nama Parfum",
+  "components": [
+    { "name": "Bahan", "percentage": 10, "category": "PILIH DARI DAFTAR DI ATAS", "note": "Keterangan" }
+  ]
+}
+</RECIPE>
+
+Jika user upload stok gudang:
+<INVENTORY>
+{
+  "items": [
+     { "name": "Bahan", "category": "Kategori" }
+  ]
+}
+</INVENTORY>`;
+
         try {
             let responseText = "";
             if (aiProvider === 'openai' && openaiKey) {
                 const openai = new OpenAI({ apiKey: openaiKey.trim(), dangerouslyAllowBrowser: true });
-                const content = [{ type: "text", text: currentInput || "Analisis resep ini." }];
+                const content = [{ type: "text", text: currentInput || "Analisis resep ini secara mendalam." }];
                 for (let i of currentImages) content.push({ type: "image_url", image_url: { url: await fileToBase64(i.file) } });
                 const res = await openai.chat.completions.create({ model: "gpt-4o-mini", messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content }] });
                 responseText = res.choices[0].message.content;
             } else if (apiKey) {
-                const body = { contents: [{ role: "user", parts: [{ text: systemPrompt + "\n\n" + (currentInput || "Analisis resep parfum ini") }] }] };
+                const body = { contents: [{ role: "user", parts: [{ text: systemPrompt + "\n\n" + (currentInput || "Analisis resep parfum ini dan berikan <RECIPE> di akhir") }] }] };
                 for (let i of currentImages) { const b64 = await fileToBase64(i.file); body.contents[0].parts.push({ inlineData: { mimeType: "image/jpeg", data: b64.split(',')[1] } }); }
                 const res = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey.trim()}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
                 const data = await res.json();
                 responseText = data.candidates?.[0]?.content?.parts?.[0]?.text || "AI sedang offline.";
             }
-            const recipeRegex = /<RECIPE>([\s\S]*?)<\/RECIPE>/;
-            const inventoryRegex = /<INVENTORY>([\s\S]*?)<\/INVENTORY>/;
-            let parsedRecipe = null; let parsedInv = null;
-            if (responseText.match(recipeRegex)) { try { parsedRecipe = JSON.parse(responseText.match(recipeRegex)[1].trim()); responseText = responseText.replace(recipeRegex, ''); } catch(e){} }
-            if (responseText.match(inventoryRegex)) { try { parsedInv = JSON.parse(responseText.match(inventoryRegex)[1].trim()); responseText = responseText.replace(inventoryRegex, ''); } catch(e){} }
-            setMessages(prev => [...prev, { id: Date.now().toString(), role: 'assistant', content: responseText, recipeData: parsedRecipe, inventoryData: parsedInv }]);
+
+            // ROBUST REGEX: Match <TAG> even if wrapped in markdown code blocks
+            const cleanAndParse = (text, tag) => {
+                const regex = new RegExp(`<${tag}>([\\s\\S]*?)(?:<\\/${tag}>|$)`);
+                const match = text.match(regex);
+                if (match) {
+                    let content = match[1].trim();
+                    // Strip potential markdown wrappers if AI was naughty
+                    content = content.replace(/^```[a-z]*\n?/, '').replace(/\n?```$/, '');
+                    try {
+                        return JSON.parse(content);
+                    } catch (e) {
+                        console.error(`Failed to parse ${tag} JSON`, e);
+                        return null;
+                    }
+                }
+                return null;
+            };
+
+            const parsedRecipe = cleanAndParse(responseText, 'RECIPE');
+            const parsedInv = cleanAndParse(responseText, 'INVENTORY');
+
+            // Clean visible text from the tags for the chat bubble
+            let visibleText = responseText
+                .replace(/<RECIPE>[\s\S]*?(?:<\/RECIPE>|$)/, '')
+                .replace(/<INVENTORY>[\s\S]*?(?:<\/INVENTORY>|$)/, '')
+                .trim();
+
+            setMessages(prev => [...prev, { 
+                id: Date.now().toString(), 
+                role: 'assistant', 
+                content: visibleText || (parsedRecipe ? "Berikut adalah analisis formula parfum Anda:" : "Analisis selesai."), 
+                recipeData: parsedRecipe, 
+                inventoryData: parsedInv 
+            }]);
         } catch (e) { setMessages(prev => [...prev, { id: Date.now().toString(), role: 'assistant', content: `⚠️ Error: ${e.message}` }]); } finally { setProcessing(false); }
     };
     const fileToBase64 = (file) => new Promise((resolve) => { const reader = new FileReader(); reader.onloadend = () => resolve(reader.result); reader.readAsDataURL(file); });
