@@ -1021,11 +1021,6 @@ Do not use markdown inside the <RECIPE> or <INVENTORY> block tags.
                         </Button>
                     </div>
                     
-                    <div className="text-center mt-3">
-                        <p className="text-[10px] text-slate-500">
-                            Stokcer AI dapat melakukan kesalahan. Pastikan untuk selalu memverifikasi ulang data analisis.
-                        </p>
-                    </div>
                 </form>
             </div>
             
