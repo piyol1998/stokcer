@@ -62,17 +62,28 @@ function SettingsPage() {
       setLoading(true);
       
       try {
-          const { error } = await supabase.from('profiles').update({
+          const payload = {
+              id: user.id,
               business_name: formData.businessName,
               address: formData.address,
               phone: formData.phone,
-              telegram_chat_id: formData.telegramChatId
-          }).eq('id', user.id);
+              telegram_chat_id: formData.telegramChatId,
+              updated_at: new Date().toISOString()
+          };
+          console.log("LOG: Mencoba menyimpan ke database:", payload);
+          
+          const { data, error } = await supabase.from('profiles').upsert(payload, { onConflict: 'id' }).select();
 
-          if (error) throw error;
+          if (error) {
+              console.error("LOG ERROR SUPABASE:", error);
+              throw error;
+          }
+          
+          console.log("LOG: Berhasil disimpan! Data terbaru:", data);
           toast({ title: "Settings Saved", description: "Your business configuration has been updated." });
       } catch (err) {
-          toast({ title: "Error", description: err.message, variant: "destructive" });
+          console.error("LOG CATCH ERROR:", err);
+          toast({ title: "Gagal Menyimpan", description: err.message, variant: "destructive" });
       } finally {
           setLoading(false);
       }
@@ -317,7 +328,7 @@ function SettingsPage() {
                                 <div className="p-3 bg-indigo-900/10 border border-indigo-500/10 rounded-lg">
                                     <h4 className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider mb-1">Cara mendapatkan Chat ID:</h4>
                                     <ol className="text-[11px] text-slate-400 list-decimal list-inside space-y-1">
-                                        <li>Buka Telegram dan cari bot: <span className="text-indigo-300 font-bold">@CleithStokcerBot</span></li>
+                                        <li>Buka Telegram dan cari bot: <span className="text-indigo-300 font-bold">@StokcerBot</span></li>
                                         <li>Tekan Tombol <span className="font-bold">START</span> atau ketik <span className="font-bold">/myid</span></li>
                                         <li>Bot akan otomatis membalas dengan <span className="font-bold">ID Telegram</span> Anda</li>
                                         <li>Tempel angka tersebut pada kotak di atas lalu klik <span className="font-bold">Save Changes</span></li>

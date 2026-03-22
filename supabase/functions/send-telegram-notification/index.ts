@@ -1,10 +1,9 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 
-const TELEGRAM_TOKEN = "8613324489:AAE0SjA_e3GN9Go1iayrmDmuB7zB3P0g0kg"
+const TELEGRAM_TOKEN = "8714895102:AAHNzdxP0Z1TXKBo5BnLmhZLQTawpvMU9MA"
 
 serve(async (req) => {
-  // Handle CORS for browser requests
   if (req.method === 'OPTIONS') {
     return new Response('ok', {
       headers: {
@@ -16,22 +15,21 @@ serve(async (req) => {
   }
 
   try {
-    const body = await req.json()
+    const rawBody = await req.text()
+    const body = JSON.parse(rawBody)
+    console.log("LOG: Menerima request body:", rawBody)
 
-    // 1. Logika untuk Webhook Telegram (Menerima Chat dari User)
-    if (body.message) {
+    // Handle Telegram Webhook (Incoming)
+    if (body.message && body.message.chat) {
       const chatId = body.message.chat.id
       const text = body.message.text
-
       if (text === '/start' || text === '/myid') {
-        const replyText = `👋 Halo! ID Telegram Anda adalah:\n\n<code>${chatId}</code>\n\nSalin ID di atas dan masukkan ke pengaturan Stokcer Anda.`
-        
-        await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
+         await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             chat_id: chatId,
-            text: replyText,
+            text: `👋 Halo! ID Telegram Anda adalah:\n\n<code>${chatId}</code>\n\nSalin ID di atas dan masukkan ke pengaturan Stokcer Anda.`,
             parse_mode: "HTML"
           }),
         })
@@ -39,30 +37,45 @@ serve(async (req) => {
       return new Response(JSON.stringify({ ok: true }), { status: 200 })
     }
 
-    // 2. Logika untuk Notifikasi Internal (Dipanggil dari Aplikasi)
-    const { chatId, message } = body
+    // Handle App Notification (Outgoing)
+    const chatId = body.chatId || body.chat_id
+    const message = body.message
 
-    if (!chatId || !message) {
-      return new Response(JSON.stringify({ error: 'Missing chatId or message' }), { status: 400 })
+    if (chatId && message) {
+      // FORCE PARSE TO INTEGER if needed
+      const cleanChatId = typeof chatId === 'string' ? parseInt(chatId, 10) : chatId
+      
+      console.log(`LOG: Mengirim notifikasi ke ID ${cleanChatId}`)
+      
+      const tgResponse = await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chat_id: cleanChatId,
+          text: message,
+          parse_mode: "HTML"
+        }),
+      })
+      
+      const tgResult = await tgResponse.json()
+      console.log("LOG: Hasil dari Telegram:", JSON.stringify(tgResult))
+      
+      return new Response(JSON.stringify(tgResult), {
+        status: tgResponse.status,
+        headers: { 
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*'
+        }
+      })
     }
 
-    const response = await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text: message,
-        parse_mode: "HTML"
-      }),
-    })
-
-    const result = await response.json()
-    return new Response(JSON.stringify(result), {
-      status: response.status,
-      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
+    return new Response(JSON.stringify({ error: "No chatId or message provided" }), { 
+        status: 400,
+        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
     })
 
   } catch (error) {
+    console.error("LOG ERROR:", error.message)
     return new Response(JSON.stringify({ error: error.message }), {
       status: 400,
       headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
