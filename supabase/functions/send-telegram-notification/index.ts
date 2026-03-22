@@ -113,15 +113,27 @@ serve(async (req) => {
 
       // 4. Panggil AI Engine (Gemini)
       try {
-        const aiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${activeApiKey}`, {
+        console.log(`LOG: Mengirim permintaan ke Gemini menggunakan model flash-stable...`)
+        const aiResponse = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${activeApiKey}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             contents: [{ parts: [{ text: `${context}\n\nPertanyaan Owner: ${text}` }] }]
           })
         })
+        
         const aiData = await aiResponse.json()
-        const replyText = aiData?.candidates?.[0]?.content?.parts?.[0]?.text || "Maaf, otak AI saya sedang istirahat. Bisa ulangi pertanyaannya?"
+        console.log("LOG: Jawaban mentah Gemini:", JSON.stringify(aiData))
+
+        // CEK KANDIDAT JAWABAN
+        let replyText = aiData?.candidates?.[0]?.content?.parts?.[0]?.text
+        
+        // JIKA GAGAL KARENA API ERROR
+        if (!replyText && aiData.error) {
+           replyText = `❌ AI Error: ${aiData.error.message || "Gagal memproses data"}. Pastikan API Key di menu Integrasi Anda benar.`
+        } else if (!replyText) {
+           replyText = "Maaf, otak AI saya sedang istirahat sejenak (Jawaban Kosong). Bisa coba lagi nanti?"
+        }
 
         // 5. Kirim balasan ke Telegram
         await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
