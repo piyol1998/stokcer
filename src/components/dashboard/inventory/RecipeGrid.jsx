@@ -303,22 +303,46 @@ function RecipeGrid({ onUpdate }) {
 
                         setGeneralInfo({ name: aiData.title || '', description: 'Hasil deteksi AI Studio Stokcer' });
                         
-                        // Group AI components by their actual category from the database (case-insensitive)
+                        // Two-pass approach to group AI components by category
+                        // Pass 1: Match all components against DB and find the dominant category
+                        const matchedComponents = (aiData.components || []).map(comp => {
+                            const match = (fetchedMaterials || []).find(m => 
+                                m.name.toLowerCase().trim() === comp.name?.toLowerCase().trim()
+                            );
+                            return { comp, match };
+                        });
+
+                        // Find the most common category among matched materials
+                        const categoryCounts = {};
+                        matchedComponents.forEach(({ match }) => {
+                            if (match?.category) {
+                                const key = match.category.toUpperCase().trim();
+                                categoryCounts[key] = (categoryCounts[key] || 0) + 1;
+                            }
+                        });
+                        // Dominant category = the one with most materials; fallback to 'Material sintetik'
+                        const dominantCategoryKey = Object.entries(categoryCounts)
+                            .sort((a, b) => b[1] - a[1])[0]?.[0] || 'MATERIAL SINTETIK';
+                        // Find the original-case display name for the dominant category
+                        const dominantDisplayName = matchedComponents.find(({ match }) => 
+                            match?.category?.toUpperCase().trim() === dominantCategoryKey
+                        )?.match?.category || 'Material sintetik';
+
+                        // Pass 2: Group components using dominant category as default for unmatched
                         const categoryGroups = {};       // key = UPPERCASE category, value = array of materials
-                        const categoryDisplayNames = {};  // key = UPPERCASE category, value = display name (original case)
-                        (aiData.components || []).forEach(comp => {
-                            const match = (fetchedMaterials || []).find(m => m.name.toLowerCase().trim() === comp.name?.toLowerCase().trim());
-                            // Use the material's actual category from DB, default to 'Bibit' if not found
-                            const rawCategory = match?.category || 'Bibit';
-                            const categoryKey = rawCategory.toUpperCase().trim(); // Normalize for grouping
+                        const categoryDisplayNames = {};  // key = UPPERCASE category, value = display name
+                        matchedComponents.forEach(({ comp, match }) => {
+                            // Use matched category, or dominant category for unmatched materials
+                            const rawCategory = match?.category || dominantDisplayName;
+                            const categoryKey = rawCategory.toUpperCase().trim();
                             if (!categoryGroups[categoryKey]) {
                                 categoryGroups[categoryKey] = [];
-                                categoryDisplayNames[categoryKey] = rawCategory; // Keep first encountered case as display name
+                                categoryDisplayNames[categoryKey] = rawCategory;
                             }
                             categoryGroups[categoryKey].push({
                                 id: match ? match.id : '',
                                 percent_share: comp.percentage || 0,
-                                _name: comp.name // Keep name for debugging
+                                _name: comp.name
                             });
                         });
 
