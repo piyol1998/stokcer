@@ -170,9 +170,21 @@ function MarketplaceIntegration() {
                 .eq('user_id', ownerId)
                 .single();
 
+            const exclusiveAiCreds = { ...aiCreds };
+            if (exclusiveAiCreds.provider === 'gemini') {
+                exclusiveAiCreds.openai_api_key = '';
+                exclusiveAiCreds.deepseek_api_key = '';
+            } else if (exclusiveAiCreds.provider === 'openai') {
+                exclusiveAiCreds.gemini_api_key = '';
+                exclusiveAiCreds.deepseek_api_key = '';
+            } else if (exclusiveAiCreds.provider === 'deepseek') {
+                exclusiveAiCreds.gemini_api_key = '';
+                exclusiveAiCreds.openai_api_key = '';
+            }
+
             const newCreds = {
                 ...(currentData?.marketplace_creds || {}),
-                ai: aiCreds
+                ai: exclusiveAiCreds
             };
 
             const { error } = await supabase
@@ -180,7 +192,8 @@ function MarketplaceIntegration() {
                 .upsert({ user_id: ownerId, marketplace_creds: newCreds, updated_at: new Date().toISOString() });
 
             if (error) throw error;
-            toast({ title: "Berhasil", description: "Konfigurasi AI telah disimpan." });
+            setAiCreds(exclusiveAiCreds);
+            toast({ title: "Berhasil", description: `Konfigurasi AI disalin. Mesin lain telah di-disconnect secara otomatis.` });
         } catch (error) {
             toast({ title: "Gagal", description: error.message, variant: "destructive" });
         } finally {
