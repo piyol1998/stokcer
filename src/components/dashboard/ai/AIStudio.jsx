@@ -60,6 +60,10 @@ const isSimilar = (name1, name2) => {
 const RecipeBlock = ({ data, allIngredients, onAddIngredient, onNavigate }) => {
     const [missingCategories, setMissingCategories] = useState({});
     
+    // Get unique categories from existing database to provide real options
+    const existingCats = Array.from(new Set(allIngredients.map(i => i.category))).filter(Boolean);
+    const defaultCat = existingCats.find(c => c.toLowerCase().includes('material')) || existingCats[0] || "Material sintetik";
+
     if (!data || !data.components) return null;
 
     const missing = data.components.filter(comp => {
@@ -67,17 +71,17 @@ const RecipeBlock = ({ data, allIngredients, onAddIngredient, onNavigate }) => {
     });
 
     const handleSaveFormula = () => {
-        // Prepare data for the Recipe Page (Normalization FIX)
-        // Ensure categories match system: Bibit, Pelarut, Bahan Tambahan
         const preparedData = {
             ...data,
-            components: data.components.map(c => ({
-                ...c,
-                // Map AI categories to System Categories
-                category: c.category?.toLowerCase().includes('pelarut') ? 'Pelarut' : 'Bibit',
-                // Keep the exact percentage from AI
-                percentage: Number(c.percentage)
-            }))
+            components: data.components.map(c => {
+                const match = allIngredients.find(i => isSimilar(i.name, c.name));
+                return {
+                    ...c,
+                    // PRIORITY: Use exact category from Database if match found
+                    category: match ? match.category : (c.category || defaultCat),
+                    percentage: Number(c.percentage)
+                };
+            })
         };
         sessionStorage.setItem('pendingAiRecipe', JSON.stringify(preparedData));
         if (onNavigate) onNavigate('recipes');
@@ -90,29 +94,25 @@ const RecipeBlock = ({ data, allIngredients, onAddIngredient, onNavigate }) => {
                     <div className="bg-amber-600/20 px-6 py-3 border-b border-amber-500/20 flex items-center justify-between">
                         <div className="flex items-center gap-2">
                             <AlertTriangle className="w-5 h-5 text-amber-500" />
-                            <h3 className="text-xs font-black text-amber-500 uppercase tracking-widest">Input {missing.length} Bahan Ke Gudang :</h3>
+                            <h3 className="text-xs font-black text-amber-500 uppercase tracking-widest">Input {missing.length} Bahan Baru Ke Gudang :</h3>
                         </div>
                     </div>
                     <CardContent className="p-0">
                         <div className="divide-y divide-white/5">
                             {missing.map((comp, idx) => (
-                                <div key={idx} className="px-6 py-4 flex items-center justify-between bg-slate-900/40 hover:bg-slate-900/60 transition-colors">
-                                    <div className="flex flex-col">
-                                        <span className="text-sm font-bold text-slate-200">{comp.name}</span>
-                                        <span className="text-[10px] text-slate-500 uppercase font-black tracking-tighter mt-1">Saran: Kategori {comp.category || 'Bibit'}</span>
-                                    </div>
+                                <div key={idx} className="px-6 py-4 flex items-center justify-between bg-slate-900/40">
+                                    <span className="text-sm font-bold text-slate-200">{comp.name}</span>
                                     <div className="flex items-center gap-3">
-                                        <Select value={missingCategories[comp.name] || "Bibit"} onValueChange={(v) => setMissingCategories(p => ({...p, [comp.name]: v}))}>
-                                            <SelectTrigger className="w-36 h-9 text-[10px] bg-slate-950 border-slate-700 font-bold uppercase">
+                                        <Select value={missingCategories[comp.name] || defaultCat} onValueChange={(v) => setMissingCategories(p => ({...p, [comp.name]: v}))}>
+                                            <SelectTrigger className="w-44 h-9 text-[10px] bg-slate-950 border-slate-700 font-bold uppercase">
                                                 <SelectValue />
                                             </SelectTrigger>
                                             <SelectContent className="bg-slate-950 border-slate-800 text-slate-300">
-                                                <SelectItem value="Bibit">Bibit</SelectItem>
-                                                <SelectItem value="Pelarut">Pelarut</SelectItem>
-                                                <SelectItem value="Bahan Tambahan">Bahan Tambahan</SelectItem>
+                                                {existingCats.map(cat => <SelectItem key={cat} value={cat}>{cat}</SelectItem>)}
+                                                {!existingCats.includes("Material sintetik") && <SelectItem value="Material sintetik">Material sintetik</SelectItem>}
                                             </SelectContent>
                                         </Select>
-                                        <Button size="sm" className="bg-amber-600 hover:bg-amber-500 h-9 px-6 text-[10px] font-black tracking-widest transition-transform active:scale-90" onClick={() => onAddIngredient(comp.name, missingCategories[comp.name] || "Bibit")}>
+                                        <Button size="sm" className="bg-amber-600 hover:bg-amber-500 h-9 px-6 text-[10px] font-black tracking-widest transition-transform active:scale-90" onClick={() => onAddIngredient(comp.name, missingCategories[comp.name] || defaultCat)}>
                                             <Plus className="w-4 h-4 mr-1.5" /> + INPUT
                                         </Button>
                                     </div>
@@ -123,22 +123,18 @@ const RecipeBlock = ({ data, allIngredients, onAddIngredient, onNavigate }) => {
                 </Card>
             )}
 
-            <Card className="bg-[#0f172a]/90 border-slate-700 shadow-[0_32px_64px_-12px_rgba(0,0,0,0.8)] overflow-hidden backdrop-blur-2xl ring-1 ring-white/10">
+            <Card className="bg-[#0f172a]/90 border-slate-700 shadow-2xl overflow-hidden backdrop-blur-2xl ring-1 ring-white/10">
                 <CardHeader className="p-6 border-b border-white/5 bg-gradient-to-r from-indigo-600/10 to-transparent flex flex-row items-center justify-between">
                     <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-2xl bg-indigo-500/20 flex items-center justify-center border border-indigo-500/30">
+                        <div className="w-12 h-12 rounded-2xl bg-indigo-500/20 flex items-center justify-center border border-indigo-500/30 shadow-inner">
                             <FlaskConical className="w-6 h-6 text-indigo-400" />
                         </div>
                         <div>
                             <CardTitle className="text-lg font-black text-white tracking-tight uppercase">Resep Parfum Terdeteksi</CardTitle>
-                            <CardDescription className="text-xs text-slate-400 font-medium tracking-tight">Status sinkronisasi real-time dengan stok Anda</CardDescription>
+                            <CardDescription className="text-xs text-slate-400 font-medium tracking-tight">Menampilkan kategori asli dari database Anda</CardDescription>
                         </div>
                     </div>
-                    <Button 
-                        size="sm" 
-                        className="bg-[#4143e2] hover:bg-[#4143e2]/90 text-[11px] font-black h-10 px-6 tracking-widest rounded-xl shadow-xl shadow-indigo-900/40 border border-indigo-500/50" 
-                        onClick={handleSaveFormula}
-                    >
+                    <Button size="sm" className="bg-[#4143e2] hover:bg-[#4143e2]/90 text-[11px] font-black h-10 px-6 tracking-widest rounded-xl shadow-xl shadow-indigo-900/40 border border-indigo-500/50" onClick={handleSaveFormula}>
                          <Check className="w-4 h-4 mr-2" /> SIMPAN FORMULA
                     </Button>
                 </CardHeader>
@@ -150,7 +146,6 @@ const RecipeBlock = ({ data, allIngredients, onAddIngredient, onNavigate }) => {
                                     <th className="px-6 py-5">Bahan Baku</th>
                                     <th className="px-6 py-5">%</th>
                                     <th className="px-6 py-5">Kategori</th>
-                                    <th className="px-6 py-5">Note</th>
                                     <th className="px-6 py-5 text-right">Status Gudang</th>
                                 </tr>
                             </thead>
@@ -172,11 +167,10 @@ const RecipeBlock = ({ data, allIngredients, onAddIngredient, onNavigate }) => {
                                                     {comp.percentage}%
                                                 </span>
                                             </td>
-                                            <td className="px-6 py-5 text-slate-400 font-black uppercase text-[10px] tracking-widest">
-                                                {comp.category || 'Bibit'}
-                                            </td>
-                                            <td className="px-6 py-5 uppercase font-black text-[9px] text-slate-500 tracking-wider">
-                                                {comp.note || 'Middle Note'}
+                                            <td className="px-6 py-5">
+                                                <Badge className="bg-slate-800/80 text-slate-300 border border-white/5 font-black uppercase text-[9px] px-2 h-6 tracking-widest">
+                                                    {match ? match.category : (comp.category || defaultCat)}
+                                                </Badge>
                                             </td>
                                             <td className="px-6 py-5 text-right">
                                                 {match ? 
@@ -204,22 +198,11 @@ const InventoryCheckBlock = ({ data, allIngredients, onAddIngredient, onDeleteIn
     if (!data || !data.items) return null;
     return (
         <Card className="bg-[#0f172a]/80 border-slate-700 my-4 w-full max-w-4xl shadow-2xl backdrop-blur-xl overflow-hidden animate-in fade-in duration-300">
-            <CardHeader className="p-5 border-b border-white/5 bg-slate-800/20">
-                <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-emerald-500/20 flex items-center justify-center border border-emerald-500/30 text-emerald-400 shadow-inner">
-                        <Database className="w-5 h-5" />
-                    </div>
-                    <CardTitle className="text-sm font-black text-slate-200 uppercase tracking-widest">Hasil Scan Inventaris</CardTitle>
-                </div>
-            </CardHeader>
+            <CardHeader className="p-5 border-b border-white/5 bg-slate-800/20 font-black uppercase tracking-widest text-sm text-slate-200">Hasil Scan Inventaris</CardHeader>
             <CardContent className="p-0">
                 <table className="w-full text-xs text-left">
                     <thead className="bg-slate-950/50 text-slate-500 uppercase tracking-widest text-[10px] font-black border-b border-white/5">
-                        <tr>
-                            <th className="px-6 py-5">Nama Item</th>
-                            <th className="px-6 py-5">Kategori</th>
-                            <th className="px-6 py-5 text-right">Aksi</th>
-                        </tr>
+                        <tr><th className="px-6 py-5">Nama Item</th><th className="px-6 py-5">Kategori</th><th className="px-6 py-5 text-right">Aksi</th></tr>
                     </thead>
                     <tbody className="divide-y divide-white/5">
                         {data.items.map((item, idx) => {
@@ -227,11 +210,11 @@ const InventoryCheckBlock = ({ data, allIngredients, onAddIngredient, onDeleteIn
                             return (
                                 <tr key={idx} className="hover:bg-white/[0.03] transition-colors">
                                     <td className="px-6 py-5 font-bold tracking-tight text-slate-200 text-sm">{item.name}</td>
-                                    <td className="px-6 py-5 text-slate-400 text-[10px] uppercase font-black tracking-widest">{dbItem?.category || item.category || 'Bibit'}</td>
+                                    <td className="px-6 py-5 text-slate-400 text-[10px] uppercase font-black tracking-widest">{dbItem?.category || item.category || 'Material sintetik'}</td>
                                     <td className="px-6 py-5 text-right">
                                         {dbItem ? 
-                                            <Button variant="ghost" size="sm" className="h-9 text-rose-500 hover:text-rose-400 hover:bg-rose-500/10 px-4 font-black text-[10px] uppercase tracking-widest" onClick={() => onDeleteIngredient(dbItem.id, dbItem.name)}>HAPUS</Button> :
-                                            <Button size="sm" className="h-9 bg-emerald-600 hover:bg-emerald-500 text-[10px] px-6 font-black uppercase tracking-widest shadow-lg shadow-emerald-900/20" onClick={() => onAddIngredient(item.name, item.category || "Bibit")}>INPUT</Button>
+                                            <Button variant="ghost" size="sm" className="h-9 text-rose-500 hover:text-rose-400 font-black text-[10px] uppercase tracking-widest" onClick={() => onDeleteIngredient(dbItem.id, dbItem.name)}>HAPUS</Button> :
+                                            <Button size="sm" className="h-9 bg-emerald-600 hover:bg-emerald-500 text-[10px] px-6 font-black uppercase shadow-lg shadow-emerald-900/20" onClick={() => onAddIngredient(item.name, item.category || "Material sintetik")}>INPUT</Button>
                                         }
                                     </td>
                                 </tr>
@@ -257,26 +240,12 @@ function AIStudio({ onNavigate }) {
     const [images, setImages] = useState([]); 
     const [allIngredients, setAllIngredients] = useState([]);
     const [dbProfile, setDbProfile] = useState(null);
-    const [dbStats, setDbStats] = useState({
-        totalModalDikeluarkan: 0,
-        sisaModalBahan: 0,
-        totalProductionCost: 0,
-        totalBatches: 0,
-        totalSales: 0
-    });
+    const [dbStats, setDbStats] = useState({ totalModalDikeluarkan: 0, sisaModalBahan: 0, totalProductionCost: 0, totalBatches: 0, totalSales: 0 });
     const fileInputRef = useRef(null);
     const chatEndRef = useRef(null);
 
-    useEffect(() => {
-        if (ownerId) {
-            fetchSettings();
-            fetchDataContext();
-        }
-    }, [ownerId]);
-
-    useEffect(() => {
-        chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }, [messages, processing]);
+    useEffect(() => { if (ownerId) { fetchSettings(); fetchDataContext(); } }, [ownerId]);
+    useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, processing]);
 
     const fetchSettings = async () => {
         try {
@@ -318,8 +287,6 @@ function AIStudio({ onNavigate }) {
                     });
                 }
             });
-            let totalSalesAmount = 0;
-            sales.forEach(o => { totalSalesAmount += Number(o.total_amount || 0); });
             setAllIngredients(materials);
             setDbProfile(profRes.data || null);
             setDbStats({
@@ -327,7 +294,7 @@ function AIStudio({ onNavigate }) {
                 sisaModalBahan: Math.round(totalStockValue),
                 totalProductionCost: Math.round(totalProductionCost),
                 totalBatches: history.length,
-                totalSales: Math.round(totalSalesAmount)
+                totalSales: Math.round(sales.reduce((acc, o) => acc + Number(o.total_amount || 0), 0))
             });
         } catch (e) { console.error(e); }
     };
@@ -346,7 +313,7 @@ function AIStudio({ onNavigate }) {
         try {
             await supabase.from('raw_materials').update({ deleted_at: new Date().toISOString() }).eq('id', id);
             setAllIngredients(prev => prev.filter(i => i.id !== id));
-            toast({ title: "Sudah Dihapus", description: `${name} telah dikeluarkan.` });
+            toast({ title: "Terhapus", description: `${name} telah dikeluarkan.` });
         } catch (e) { console.error(e); }
     };
 
@@ -358,12 +325,8 @@ function AIStudio({ onNavigate }) {
         setMessages(prev => [...prev, { id: Date.now().toString(), role: 'user', content: inputText, images: currentImages.map(img => img.preview) }]);
         setInputText(''); setImages([]); setProcessing(true);
         const systemPrompt = `Anda AI Ahli Kimia & Strategis Parfum Cleith. Bahasa: Indonesia.
-ATURAN KATEGORI STOKCER:
-- Bibit: Inti parfum (EO, Aroma Chemicals).
-- Pelarut: Alkohol, DPG, Fixative.
-- Bahan Tambahan: Pewarna, Anti-UV.
-MODAL: Rp ${dbStats.totalModalDikeluarkan.toLocaleString('id-ID')}.
-Wajib JSON <RECIPE>{"title": "Nama", "components": [{"name": "A", "percentage": 10, "category": "Bibit", "note": "Top Note"}]}</RECIPE>.`;
+KATEGORI DI DATABASE: ${Array.from(new Set(allIngredients.map(i => i.category))).join(', ')}.
+Wajib JSON <RECIPE>{"title": "Nama", "components": [{"name": "A", "percentage": 10, "category": "Kategori Sesuai Database", "note": "Top Note"}]}</RECIPE>.`;
         try {
             let responseText = "";
             if (aiProvider === 'openai' && openaiKey) {
@@ -374,13 +337,10 @@ Wajib JSON <RECIPE>{"title": "Nama", "components": [{"name": "A", "percentage": 
                 responseText = res.choices[0].message.content;
             } else if (apiKey) {
                 const body = { contents: [{ role: "user", parts: [{ text: systemPrompt + "\n\n" + (currentInput || "Analisis resep parfum ini") }] }] };
-                for (let i of currentImages) {
-                    const b64 = await fileToBase64(i.file);
-                    body.contents[0].parts.push({ inlineData: { mimeType: "image/jpeg", data: b64.split(',')[1] } });
-                }
+                for (let i of currentImages) { const b64 = await fileToBase64(i.file); body.contents[0].parts.push({ inlineData: { mimeType: "image/jpeg", data: b64.split(',')[1] } }); }
                 const res = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey.trim()}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
                 const data = await res.json();
-                responseText = data.candidates?.[0]?.content?.parts?.[0]?.text || "Koneksi Reset.";
+                responseText = data.candidates?.[0]?.content?.parts?.[0]?.text || "AI sedang offline.";
             }
             const recipeRegex = /<RECIPE>([\s\S]*?)<\/RECIPE>/;
             const inventoryRegex = /<INVENTORY>([\s\S]*?)<\/INVENTORY>/;
@@ -390,63 +350,31 @@ Wajib JSON <RECIPE>{"title": "Nama", "components": [{"name": "A", "percentage": 
             setMessages(prev => [...prev, { id: Date.now().toString(), role: 'assistant', content: responseText, recipeData: parsedRecipe, inventoryData: parsedInv }]);
         } catch (e) { setMessages(prev => [...prev, { id: Date.now().toString(), role: 'assistant', content: `⚠️ Error: ${e.message}` }]); } finally { setProcessing(false); }
     };
-    const fileToBase64 = (file) => new Promise((resolve) => {
-        const reader = new FileReader(); reader.onloadend = () => resolve(reader.result); reader.readAsDataURL(file);
-    });
+    const fileToBase64 = (file) => new Promise((resolve) => { const reader = new FileReader(); reader.onloadend = () => resolve(reader.result); reader.readAsDataURL(file); });
     if (loading) return <div className="flex h-full items-center justify-center p-20"><Loader2 className="animate-spin text-indigo-500 w-12 h-12" /></div>;
     return (
         <div className="flex flex-col h-[calc(100vh-6rem)] animate-in fade-in duration-500 overflow-hidden relative">
             <header className="shrink-0 flex items-center justify-between pb-4 border-b border-slate-800">
                 <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-2xl bg-indigo-600/10 flex items-center justify-center border border-indigo-500/20 shadow-inner">
-                        <Sparkles className="w-6 h-6 text-indigo-400" />
-                    </div>
-                    <div>
-                        <h2 className="text-xl font-black text-white leading-none uppercase tracking-tight">AI Studio Stokcer</h2>
-                        <span className="text-[10px] text-indigo-500 font-black tracking-widest uppercase mt-2 block tracking-widest">Perfume Intelligence System</span>
-                    </div>
+                    <div className="w-12 h-12 rounded-2xl bg-indigo-600/10 flex items-center justify-center border border-indigo-500/20 shadow-inner"><Sparkles className="w-6 h-6 text-indigo-400" /></div>
+                    <div><h2 className="text-xl font-black text-white leading-none uppercase tracking-tight">AI Studio Stokcer</h2><span className="text-[10px] text-indigo-500 font-black tracking-widest uppercase mt-2 block tracking-widest">Perfume Intelligence Deep Analysis</span></div>
                 </div>
             </header>
             <div className="flex-1 overflow-y-auto px-2 py-8 space-y-10 scroll-smooth">
                 {messages.length === 0 ? (
-                    <div className="h-full flex flex-col items-center justify-center text-center p-8 max-w-lg mx-auto grayscale opacity-40">
-                        <BrainCircuit className="w-20 h-20 text-indigo-500 mb-8" />
-                        <h3 className="text-3xl font-black text-white uppercase tracking-tighter">Strategic Intelligence</h3>
-                        <p className="text-slate-500 mt-3 text-sm font-bold italic">Siap menganalisis resep parfum & data keuangan Anda.</p>
-                    </div>
+                    <div className="h-full flex flex-col items-center justify-center text-center p-8 max-w-lg mx-auto grayscale opacity-40"><BrainCircuit className="w-20 h-20 text-indigo-500 mb-8" /><h3 className="text-3xl font-black text-white uppercase tracking-tighter">Strategic Intelligence</h3><p className="text-slate-500 mt-3 text-sm font-medium italic">Ready to analyze your perfume formula & financial data.</p></div>
                 ) : (
                     messages.map((msg) => (
-                        <div key={msg.id} className={`flex gap-6 max-w-5xl mx-auto ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
-                            <div className={`shrink-0 w-12 h-12 rounded-2xl flex items-center justify-center shadow-2xl transition-all ${msg.role === 'user' ? 'bg-indigo-600 rotate-3' : 'bg-slate-800 border border-slate-700 -rotate-3'}`}>
-                                {msg.role === 'user' ? <User className="w-6 h-6 text-white" /> : <Sparkles className="w-6 h-6 text-indigo-400" />}
-                            </div>
-                            <div className={`flex flex-col gap-4 max-w-[85%] ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
-                                {msg.images && msg.images.length > 0 && (
-                                    <div className="flex flex-wrap gap-4 justify-end mb-1">
-                                        {msg.images.map((img, i) => <img key={i} src={img} className="rounded-2xl border-2 border-slate-700 max-w-[300px] shadow-3xl grayscale hover:grayscale-0 transition-all duration-500" alt="upload" />)}
-                                    </div>
-                                )}
-                                <div className={`px-6 py-4 rounded-3xl text-[14px] leading-relaxed shadow-3xl ${msg.role === 'user' ? 'bg-indigo-600 text-white rounded-tr-none' : 'bg-slate-800/90 text-slate-200 rounded-tl-none border border-white/5 backdrop-blur-md whitespace-pre-line'}`}>
-                                    {msg.content}
-                                </div>
-                                {msg.recipeData && <RecipeBlock data={msg.recipeData} allIngredients={allIngredients} onAddIngredient={addIngredient} onNavigate={onNavigate} />}
-                                {msg.inventoryData && <InventoryCheckBlock data={msg.inventoryData} allIngredients={allIngredients} onAddIngredient={addIngredient} onDeleteIngredient={deleteIngredient} />}
-                            </div>
-                        </div>
+                        <div key={msg.id} className={`flex gap-6 max-w-5xl mx-auto ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}><div className={`shrink-0 w-12 h-12 rounded-2xl flex items-center justify-center shadow-2xl transition-all ${msg.role === 'user' ? 'bg-indigo-600 rotate-3' : 'bg-slate-800 border border-slate-700 -rotate-3'}`}>{msg.role === 'user' ? <User className="w-6 h-6 text-white" /> : <Sparkles className="w-6 h-6 text-indigo-400" />}</div><div className={`flex flex-col gap-4 max-w-[85%] ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>{msg.images && msg.images.length > 0 && (<div className="flex flex-wrap gap-4 justify-end mb-1">{msg.images.map((img, i) => <img key={i} src={img} className="rounded-2xl border-2 border-slate-700 max-w-[300px] shadow-3xl" alt="upload" />)}</div>)}<div className={`px-6 py-4 rounded-3xl text-[14px] leading-relaxed shadow-3xl ${msg.role === 'user' ? 'bg-indigo-600 text-white rounded-tr-none' : 'bg-slate-800/90 text-slate-200 rounded-tl-none border border-white/5 backdrop-blur-md whitespace-pre-line'}`}>{msg.content}</div>{msg.recipeData && <RecipeBlock data={msg.recipeData} allIngredients={allIngredients} onAddIngredient={addIngredient} onNavigate={onNavigate} />}{msg.inventoryData && <InventoryCheckBlock data={msg.inventoryData} allIngredients={allIngredients} onAddIngredient={addIngredient} onDeleteIngredient={deleteIngredient} />}</div></div>
                     ))
                 )}
                 {processing && <div className="max-w-4xl mx-auto flex items-center gap-4 pl-20 animate-pulse text-indigo-400 font-bold uppercase tracking-widest text-[10px]">AI is analyzing...</div>}
                 <div ref={chatEndRef} />
             </div>
             <div className="shrink-0 max-w-5xl mx-auto w-full pb-8 px-2">
-                <form onSubmit={handleSubmit} className="relative">
-                    <div className="flex items-center gap-3 bg-[#0f172a] border border-white/10 rounded-[2rem] p-3 pl-5 pr-3 shadow-3xl focus-within:border-indigo-500/50 transition-all duration-300">
-                        <Button type="button" variant="ghost" size="icon" onClick={() => fileInputRef.current?.click()} className="text-slate-500 hover:text-indigo-400 hover:bg-slate-800 transition-all rounded-2xl w-12 h-12"><Plus className="w-7 h-7" /></Button>
-                        <input type="file" ref={fileInputRef} onChange={(e) => { const file = e.target.files?.[0]; if (file) { const reader = new FileReader(); reader.onloadend = () => setImages([{ file, preview: reader.result }]); reader.readAsDataURL(file); } }} className="hidden" accept="image/*" />
-                        <Input value={inputText} onChange={(e) => setInputText(e.target.value)} placeholder="Tanya tentang modal atau input formula baru..." className="bg-transparent border-none focus-visible:ring-0 text-white h-12 text-sm placeholder:text-slate-600 font-medium" />
-                        <Button type="submit" disabled={processing || (!inputText.trim() && images.length === 0)} className="bg-indigo-600 hover:bg-indigo-500 shadow-indigo-900/50 shrink-0 w-12 h-12 rounded-2xl transition-all active:scale-95"><ArrowUp className="w-6 h-6 text-white" /></Button>
-                    </div>
-                </form>
+                <form onSubmit={handleSubmit} className="relative"><div className="flex items-center gap-3 bg-[#0f172a] border border-white/10 rounded-[2rem] p-3 pl-5 pr-3 shadow-3xl focus-within:border-indigo-500/50 transition-all duration-300"><Button type="button" variant="ghost" size="icon" onClick={() => fileInputRef.current?.click()} className="text-slate-500 hover:text-indigo-400 hover:bg-slate-800 transition-all rounded-2xl w-12 h-12"><Plus className="w-7 h-7" /></Button><input type="file" ref={fileInputRef} onChange={(e) => { const file = e.target.files?.[0]; if (file) { const reader = new FileReader(); reader.onloadend = () => setImages([{ file, preview: reader.result }]); reader.readAsDataURL(file); } }} className="hidden" accept="image/*" />
+                <Input value={inputText} onChange={(e) => setInputText(e.target.value)} placeholder="Tanya tentang modal atau input formula baru..." className="bg-transparent border-none focus-visible:ring-0 text-white h-12 text-sm placeholder:text-slate-600 font-medium" />
+                <Button type="submit" disabled={processing || (!inputText.trim() && images.length === 0)} className="bg-indigo-600 hover:bg-indigo-500 shadow-indigo-900/50 shrink-0 w-12 h-12 rounded-2xl transition-all active:scale-95"><ArrowUp className="w-6 h-6 text-white" /></Button></div></form>
             </div>
         </div>
     );
