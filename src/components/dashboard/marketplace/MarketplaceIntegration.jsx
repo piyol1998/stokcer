@@ -551,11 +551,12 @@ function MarketplaceIntegration() {
                                             </div>
                                             <div>
                                                 <h4 className={`font-bold text-sm ${isConnected ? 'text-emerald-400' : 'text-rose-400'}`}>
-                                                    {isConnected ? 'Status: Terhubung' : 'Status: API Key Kosong'}
+                                                    {isConnected ? 'API Key Siap Digunakan' : 'API Key Belum Diisi'}
                                                 </h4>
                                                 <p className="text-xs text-slate-400 mt-1">
-                                                    {isConnected ? `Sistem Cleith saat ini menggunakan mesin ` : 'Silakan lengkapi API Key di bawah untuk mesin '}
-                                                    <strong className="text-slate-200">{providerName}</strong>.
+                                                    {isConnected ? `Kunci API untuk mesin ` : 'Silakan masukkin kunci API untuk '}
+                                                    <strong className="text-slate-200">{providerName}</strong>
+                                                    {isConnected ? ` sudah tersimpan di sistem. Tekan Simpan di bawah jika Anda ingin menjadikannya AI Utama.` : ` di kolom bawah.`}
                                                 </p>
                                             </div>
                                         </div>
