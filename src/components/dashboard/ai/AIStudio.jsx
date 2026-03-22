@@ -36,11 +36,15 @@ import {
     SelectValue 
 } from "@/components/ui/select";
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import OpenAI from "openai";
 
 function AIStudio() {
     const { ownerId } = useAuth();
     const { toast } = useToast();
-    const [apiKey, setApiKey] = useState('');
+    const [aiProvider, setAiProvider] = useState('gemini');
+    const [apiKey, setApiKey] = useState(''); // Gemini
+    const [openaiKey, setOpenaiKey] = useState('');
+    const [deepseekKey, setDeepseekKey] = useState('');
     const [loading, setLoading] = useState(true);
     const [processing, setProcessing] = useState(false);
     const [image, setImage] = useState(null);
@@ -66,8 +70,12 @@ function AIStudio() {
                 .eq('user_id', ownerId)
                 .single();
             
-            if (data?.marketplace_creds?.ai?.gemini_api_key) {
-                setApiKey(data.marketplace_creds.ai.gemini_api_key);
+            if (data?.marketplace_creds?.ai) {
+                const creds = data.marketplace_creds.ai;
+                setAiProvider(creds.provider || 'gemini');
+                setApiKey(creds.gemini_api_key || '');
+                setOpenaiKey(creds.openai_api_key || '');
+                setDeepseekKey(creds.deepseek_api_key || '');
             }
         } catch (error) {
             console.error("Fetch settings error:", error);
@@ -101,6 +109,12 @@ function AIStudio() {
         }
     };
 
+    const fileToBase64 = (file) => new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.readAsDataURL(file);
+    });
+
     const fileToGenerativePart = async (file) => {
         const base64EncodedDataPromise = new Promise((resolve) => {
             const reader = new FileReader();
@@ -113,10 +127,6 @@ function AIStudio() {
     };
 
     const runAnalysis = async () => {
-        if (!apiKey) {
-            toast({ title: "API Key diperlukan", description: "Silakan masukkan API Key Gemini di menu Integrasi.", variant: "destructive" });
-            return;
-        }
         if (!image) {
             toast({ title: "Gambar diperlukan", description: "Silakan upload foto resep parfum Anda.", variant: "destructive" });
             return;
@@ -124,21 +134,6 @@ function AIStudio() {
 
         setProcessing(true);
         try {
-            const genAI = new GoogleGenerativeAI(apiKey);
-            
-            // Try different models until one succeeds
-            const modelsToTry = [
-                "gemini-1.5-flash", 
-                "gemini-1.5-pro",
-                "gemini-1.5-flash-latest",
-                "gemini-1.0-pro-vision-latest",
-                "gemini-pro-vision"
-            ];
-            
-            let result = null;
-            let lastError = null;
-            const imagePart = await fileToGenerativePart(image);
-
             const prompt = `
                 Analyze this perfume composition image. 
                 1. Extract the ingredients (Top Notes, Heart Notes, Base Notes).
@@ -153,39 +148,85 @@ function AIStudio() {
                 Wait! Only return the JSON. No other text.
             `;
 
-            for (const modelName of modelsToTry) {
-                try {
-                    console.log("Trying Gemini model:", modelName);
-                    const model = genAI.getGenerativeModel({ model: modelName });
-                    result = await model.generateContent([prompt, imagePart]);
-                    break; // Success! Break the loop
-                } catch (err) {
-                    console.warn(`Model ${modelName} failed:`, err.message);
-                    lastError = err;
-                    // If it's a 404, we continue to the next model. Otherwise, we might want to throw.
-                    if (!err.message.includes('404')) {
-                        throw err; // e.g. Invalid API Key should not retry
+            let parsed = null;
+
+            if (aiProvider === 'openai') {
+                if (!openaiKey) throw new Error("API Key OpenAI tidak ditemukan. Silakan atur di menu Integrasi.");
+                const openai = new OpenAI({ apiKey: openaiKey, dangerouslyAllowBrowser: true });
+                const base64Image = await fileToBase64(image);
+
+                const response = await openai.chat.completions.create({
+                    model: "gpt-4o",
+                    messages: [
+                        {
+                            role: "user",
+                            content: [
+                                { type: "text", text: prompt },
+                                { type: "image_url", image_url: { url: base64Image } }
+                            ]
+                        }
+                    ],
+                    response_format: { type: "json_object" }
+                });
+
+                const content = response.choices[0].message.content;
+                parsed = JSON.parse(content);
+            } else if (aiProvider === 'deepseek') {
+                if (!deepseekKey) throw new Error("API Key DeepSeek tidak ditemukan. Silakan atur di menu Integrasi.");
+                toast({ 
+                    title: "Vision Belum Didukung", 
+                    description: "DeepSeek API saat ini belum secara native mendukung analisis gambar/foto. Silakan ganti ke Gemini atau OpenAI di pengaturan Integrasi AI.",
+                    variant: "destructive" 
+                });
+                setProcessing(false);
+                return;
+            } else {
+                // Gemini Fallback
+                if (!apiKey) throw new Error("API Key Gemini tidak ditemukan. Silakan atur di menu Integrasi.");
+                const genAI = new GoogleGenerativeAI(apiKey);
+                
+                const modelsToTry = [
+                    "gemini-1.5-flash", 
+                    "gemini-1.5-pro",
+                    "gemini-1.5-flash-latest",
+                    "gemini-1.0-pro-vision-latest",
+                    "gemini-pro-vision"
+                ];
+                
+                let result = null;
+                let lastError = null;
+                const imagePart = await fileToGenerativePart(image);
+
+                for (const modelName of modelsToTry) {
+                    try {
+                        console.log("Trying Gemini model:", modelName);
+                        const model = genAI.getGenerativeModel({ model: modelName });
+                        result = await model.generateContent([prompt, imagePart]);
+                        break; 
+                    } catch (err) {
+                        console.warn(`Model ${modelName} failed:`, err.message);
+                        lastError = err;
+                        if (!err.message.includes('404')) {
+                            throw err; 
+                        }
                     }
                 }
-            }
 
-            if (!result) {
-                // Diagnostic: Fetch available models to see what the API key actually has access to
-                try {
-                    const diagRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
-                    const diagData = await diagRes.json();
-                    const availableModels = diagData.models ? diagData.models.map(m => m.name.replace('models/', '')).join(', ') : 'Tidak ada model';
-                    throw new Error(`[Diagnosis] API Key valid, tapi model tidak ditemukan. Model yang tersedia di API Key Anda: ${availableModels}. Error Asli: ${lastError?.message}`);
-                } catch (diagErr) {
-                    throw lastError || new Error(`Failed to generate content: ${diagErr.message}`);
+                if (!result) {
+                    try {
+                        const diagRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+                        const diagData = await diagRes.json();
+                        const availableModels = diagData.models ? diagData.models.map(m => m.name.replace('models/', '')).join(', ') : 'Tidak ada model';
+                        throw new Error(`[Diagnosis] API Key valid, tapi model tidak ditemukan. Model yang tersedia di API Key Anda: ${availableModels}. Error Asli: ${lastError?.message}`);
+                    } catch (diagErr) {
+                        throw lastError || new Error(`Failed to generate content: ${diagErr.message}`);
+                    }
                 }
-            }
 
-            const responseText = result.response.text();
-            
-            // Clean JSON string if wrapped in markdown
-            const cleanJson = responseText.replace(/```json|```/g, '').trim();
-            const parsed = JSON.parse(cleanJson);
+                const responseText = result.response.text();
+                const cleanJson = responseText.replace(/```json|```/g, '').trim();
+                parsed = JSON.parse(cleanJson);
+            }
             
             processRecipe(parsed);
         } catch (error) {

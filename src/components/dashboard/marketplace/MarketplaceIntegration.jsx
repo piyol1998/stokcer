@@ -26,6 +26,13 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Label } from '@/components/ui/label';
+import { 
+    Select, 
+    SelectContent, 
+    SelectItem, 
+    SelectTrigger, 
+    SelectValue 
+} from "@/components/ui/select";
 
 function MarketplaceIntegration() {
     const { user, ownerId } = useAuth();
@@ -59,7 +66,10 @@ function MarketplaceIntegration() {
     });
 
     const [aiCreds, setAiCreds] = useState({
+        provider: 'gemini', // 'gemini', 'openai', 'deepseek'
         gemini_api_key: '',
+        openai_api_key: '',
+        deepseek_api_key: '',
         status: 'active'
     });
 
@@ -169,7 +179,7 @@ function MarketplaceIntegration() {
                 .upsert({ user_id: ownerId, marketplace_creds: newCreds, updated_at: new Date().toISOString() });
 
             if (error) throw error;
-            toast({ title: "Berhasil", description: "API Key Gemini telah disimpan." });
+            toast({ title: "Berhasil", description: "Konfigurasi AI telah disimpan." });
         } catch (error) {
             toast({ title: "Gagal", description: error.message, variant: "destructive" });
         } finally {
@@ -517,30 +527,82 @@ function MarketplaceIntegration() {
                             <div className="flex items-center gap-3">
                                 <Cpu className="w-10 h-10 text-indigo-500" />
                                 <div>
-                                    <CardTitle>Gemini AI Configuration</CardTitle>
-                                    <CardDescription>Atur "Otak" buatan untuk sistem stok parfum Cleith.</CardDescription>
+                                    <CardTitle>AI Provider Configuration</CardTitle>
+                                    <CardDescription>Pilih dan Atur "Otak" buatan untuk sistem stok parfum Cleith.</CardDescription>
                                 </div>
                             </div>
                         </CardHeader>
                         <CardContent className="space-y-4">
                             <div className="p-4 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-xs text-indigo-300 leading-relaxed">
-                                AI Gemini akan digunakan di menu <strong>AI Studio</strong> untuk memproses foto resep formulasi, melakukan pengecekan bahan baku otomatis, dan memberikan prediksi stok di masa depan.
+                                AI akan digunakan di menu <strong>AI Studio</strong> untuk memproses foto resep formulasi, melakukan pengecekan bahan baku otomatis, dan memberikan prediksi stok di masa depan.
                             </div>
+                            
                             <div className="space-y-2">
-                                <Label className="text-slate-300">Gemini API Key</Label>
-                                <Input 
-                                    type="password"
-                                    placeholder="AIzaSy..." 
-                                    className="bg-slate-950 border-slate-800 focus:ring-indigo-500"
-                                    value={aiCreds.gemini_api_key}
-                                    onChange={e => setAiCreds({...aiCreds, gemini_api_key: e.target.value})}
-                                />
+                                <Label className="text-slate-300">Pilih AI Provider</Label>
+                                <Select 
+                                    value={aiCreds.provider}
+                                    onValueChange={(val) => setAiCreds({...aiCreds, provider: val})}
+                                >
+                                    <SelectTrigger className="bg-slate-950 border-slate-800 text-white">
+                                        <SelectValue placeholder="Pilih AI Provider" />
+                                    </SelectTrigger>
+                                    <SelectContent className="bg-slate-950 border-slate-800 text-white">
+                                        <SelectItem value="gemini">Google Gemini (Optimal)</SelectItem>
+                                        <SelectItem value="openai">OpenAI (ChatGPT-4o)</SelectItem>
+                                        <SelectItem value="deepseek">DeepSeek AI</SelectItem>
+                                    </SelectContent>
+                                </Select>
                             </div>
+
+                            {aiCreds.provider === 'gemini' && (
+                                <div className="space-y-2 animate-in fade-in duration-300">
+                                    <Label className="text-slate-300">Gemini API Key</Label>
+                                    <Input 
+                                        type="password"
+                                        placeholder="AIzaSy..." 
+                                        className="bg-slate-950 border-slate-800 focus:ring-indigo-500"
+                                        value={aiCreds.gemini_api_key}
+                                        onChange={e => setAiCreds({...aiCreds, gemini_api_key: e.target.value})}
+                                    />
+                                    <p className="text-[10px] text-slate-500">Dapatkan key dari Google AI Studio.</p>
+                                </div>
+                            )}
+
+                            {aiCreds.provider === 'openai' && (
+                                <div className="space-y-2 animate-in fade-in duration-300">
+                                    <Label className="text-slate-300">OpenAI API Key</Label>
+                                    <Input 
+                                        type="password"
+                                        placeholder="sk-proj-..." 
+                                        className="bg-slate-950 border-slate-800 focus:ring-indigo-500"
+                                        value={aiCreds.openai_api_key}
+                                        onChange={e => setAiCreds({...aiCreds, openai_api_key: e.target.value})}
+                                    />
+                                    <p className="text-[10px] text-slate-500">Dapatkan key dari OpenAI dashboard. Model yang dipakai: gpt-4o.</p>
+                                </div>
+                            )}
+
+                            {aiCreds.provider === 'deepseek' && (
+                                <div className="space-y-2 animate-in fade-in duration-300">
+                                    <Label className="text-slate-300">DeepSeek API Key</Label>
+                                    <Input 
+                                        type="password"
+                                        placeholder="sk-..." 
+                                        className="bg-slate-950 border-slate-800 focus:ring-indigo-500"
+                                        value={aiCreds.deepseek_api_key}
+                                        onChange={e => setAiCreds({...aiCreds, deepseek_api_key: e.target.value})}
+                                    />
+                                    <p className="text-[10px] text-slate-500 text-amber-500 flex items-start gap-1">
+                                        <AlertCircle className="w-3 h-3 shrink-0 mt-0.5" />
+                                        DeepSeek belum optimal memproses foto/gambar secara native seperti Gemini & OpenAI, tapi dapat digunakan untuk AI Chat/Teks di masa mendatang.
+                                    </p>
+                                </div>
+                            )}
                         </CardContent>
                         <CardFooter className="border-t border-slate-800 py-4 flex justify-end">
                             <Button onClick={handleSaveAi} disabled={saving} className="bg-indigo-600 hover:bg-indigo-700">
                                 {saving ? <RefreshCw className="animate-spin w-4 h-4 mr-2" /> : <Save className="w-4 h-4 mr-2" />}
-                                Simpan API Key
+                                Simpan Konfigurasi AI
                             </Button>
                         </CardFooter>
                     </Card>
