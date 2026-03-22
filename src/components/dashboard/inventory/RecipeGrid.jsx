@@ -12,6 +12,38 @@ import { logNotification } from '@/lib/notificationUtils';
 import { getRecipeColor } from '@/lib/utils';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
+// --- Smart Matching Utilities (Sync with AIStudio) ---
+const SYNONYMS = {
+    'ambroxan': ['ambroxide', 'cetalox', 'ambrofix', 'ambrox'],
+    'galaxolide': ['abbalide', 'musk 50'],
+    'hedione': ['methyl dihydrojasmonate', 'khariane'],
+    'iso e super': ['sylvamber', 'timbersilk', 'iso e'],
+    'ethylene brassylate': ['musk t', 'astratone'],
+    'habanolide': ['globalide'],
+    'musk ketone': ['mk'],
+    'lilial': ['lysaldehyde', 'butylphenyl methylpropional']
+};
+
+const isSimilar = (name1, name2) => {
+    const n1 = (name1 || '').toLowerCase().trim();
+    const n2 = (name2 || '').toLowerCase().trim();
+    if (n1 === n2) return true;
+    
+    // Clean names from brand variations like (IFF), (Giv)
+    const cleanN1 = n1.replace(/\s*\(.*\)\s*/g, '').trim();
+    const cleanN2 = n2.replace(/\s*\(.*\)\s*/g, '').trim();
+    if (cleanN1 === cleanN2) return true;
+
+    // Direct synonym Check
+    for (const [key, aliases] of Object.entries(SYNONYMS)) {
+        const isN1Match = n1.includes(key) || aliases.some(a => n1.includes(a));
+        const isN2Match = n2.includes(key) || aliases.some(a => n2.includes(a));
+        if (isN1Match && isN2Match) return true;
+    }
+    
+    return false;
+};
+
 // --- Customized View for Recipe A (Wizard Type) ---
 const RecipeAWizardView = ({ recipe, allMaterials, colorTheme }) => {
     const meta = recipe.metadata || {};
@@ -305,97 +337,82 @@ function RecipeGrid({ onUpdate }) {
 
                         setGeneralInfo({ name: aiData.title || '', description: 'Hasil deteksi AI Studio Stokcer' });
                         
-                        // Two-pass approach to group AI components by category
-                        // Pass 1: Match all components against DB and find the dominant category
+                        // Pass 1: Match all components against DB
                         const matchedComponents = (aiData.components || []).map(comp => {
-                            const aiName = (comp.name || '').toLowerCase().trim();
+                            const aiName = (comp.name || '').trim();
                             
-                            // Check if AI Studio already matched it
+                            // 1. Try exact ID if provided by AI Studio
                             let match = null;
-                            if (comp.matchedId && comp.matchedCategory) {
-                                match = (fetchedMaterials || []).find(m => m.id === comp.matchedId);
+                            const providedId = comp.materialId || comp.matchedId;
+                            if (providedId) {
+                                match = (fetchedMaterials || []).find(m => m.id === providedId);
                             }
                             
-                            // Fallback to Smart match if not already matched
+                            // 2. Fallback to Smart matching (isSimilar)
                             if (!match) {
-                                match = (fetchedMaterials || []).find(m => {
-                                    const dbName = m.name.toLowerCase().trim();
-                                    const aiNameClean = aiName.replace(/\s*\(.*\)\s*/g, '').trim();
-                                    return dbName === aiName || dbName === aiNameClean || aiName.includes(dbName) || dbName.includes(aiNameClean);
-                                });
+                                match = (fetchedMaterials || []).find(m => isSimilar(m.name, aiName));
                             }
+                            
                             return { comp, match };
                         });
 
-                        // Find the most common category among matched materials
-                        const categoryCounts = {};
-                        matchedComponents.forEach(({ comp, match }) => {
-                            // Prefer AI-provided matchedCategory
-                            const category = match?.category || comp.matchedCategory;
-                            if (category) {
-                                const key = category.toUpperCase().trim();
-                                categoryCounts[key] = (categoryCounts[key] || 0) + 1;
-                            }
-                        });
-                        // Dominant category fallback
-                        const dominantCategoryKey = Object.entries(categoryCounts).sort((a,b)=>b[1]-a[1])[0]?.[0] || 'MATERIAL SINTETIK';
-                        const dominantDisplayName = matchedComponents.find(({ comp, match }) => (match?.category || comp.matchedCategory)?.toUpperCase().trim() === dominantCategoryKey)?.match?.category || 'Material sintetik';
-
-                        // Pass 2: Group components
+                        // Pass 2: Group components BY THEIR ACTUAL CATEGORY
                         const categoryGroups = {};
                         const categoryDisplayNames = {};
+                        
                         matchedComponents.forEach(({ comp, match }) => {
-                            // Use matched category from DB, or matchedCategory from AI, or dominant as fallback
-                            const rawCategory = match?.category || comp.matchedCategory || dominantDisplayName;
-                            const categoryKey = rawCategory.toUpperCase().trim();
+                            // PRIORITY: Database Category > AI Suggested Category > Fallback
+                            const finalCategory = match ? match.category : (comp.category || comp.matchedCategory || 'Material sintetik');
+                            const categoryKey = finalCategory.toUpperCase().trim();
+                            
                             if (!categoryGroups[categoryKey]) {
                                 categoryGroups[categoryKey] = [];
-                                categoryDisplayNames[categoryKey] = rawCategory;
+                                categoryDisplayNames[categoryKey] = finalCategory;
                             }
+                            
                             categoryGroups[categoryKey].push({
-                                id: match ? match.id : (comp.matchedId || ''),
+                                id: match ? match.id : '',
                                 percent_share: comp.percentage || 0,
-                                _name: comp.name
+                                name: match ? match.name : comp.name 
                             });
                         });
 
-                        // Build sections from category groups
-                        const sections = Object.entries(categoryGroups).map(([catKey, materials], idx) => {
-                            // Use the display name (original case) for the section name
-                            const catName = categoryDisplayNames[catKey] || catKey;
-                            const totalPercent = materials.reduce((sum, m) => sum + (parseFloat(m.percent_share) || 0), 0);
-                            // Determine if this is a multi-material section
-                            const isMulti = materials.length > 1 || catKey.includes('BIBIT');
+                        // Pass 3: Convert Groups to Wizard Sections
+                        const sections = Object.entries(categoryGroups).map(([catKey, items], idx) => {
+                            const catName = categoryDisplayNames[catKey];
+                            const sectionTotalPercent = items.reduce((sum, item) => sum + (parseFloat(item.percent_share) || 0), 0);
+                            
+                            // Decide type: Section with multiple items is 'multi', otherwise check if it's naturally a multi-group (like Bibit)
+                            const isMulti = items.length > 1 || catName.toLowerCase().includes('bibit') || catName.toLowerCase().includes('material sintetik');
                             
                             if (isMulti) {
-                                // Recalculate percent_share relative to this section's total
-                                const adjustedMaterials = materials.map(m => ({
-                                    id: m.id,
-                                    percent_share: totalPercent > 0 ? Math.round((m.percent_share / totalPercent) * 100 * 100) / 100 : 0
-                                }));
                                 return {
                                     id: `sec-ai-${idx}-${Date.now()}`,
                                     name: catName,
-                                    percent: Math.round(totalPercent * 100) / 100,
+                                    percent: Math.round(sectionTotalPercent * 100) / 100,
                                     type: 'multi',
-                                    materials: adjustedMaterials
+                                    materials: items.map(item => ({
+                                        id: item.id,
+                                        // Calculate share inside the section
+                                        percent_share: sectionTotalPercent > 0 
+                                            ? Math.round((item.percent_share / sectionTotalPercent) * 100 * 100) / 100 
+                                            : 0
+                                    }))
                                 };
                             } else {
                                 return {
                                     id: `sec-ai-${idx}-${Date.now()}`,
                                     name: catName,
-                                    percent: Math.round(totalPercent * 100) / 100,
+                                    percent: Math.round(sectionTotalPercent * 100) / 100,
                                     type: 'single',
-                                    materialId: materials[0]?.id || '',
+                                    materialId: items[0]?.id || '',
                                     materials: []
                                 };
                             }
                         });
 
                         setWizardData({
-                            sections: sections.length > 0 ? sections : [
-                                { id: `sec-${Date.now()}`, name: 'Bibit', percent: 100, type: 'multi', materials: [] }
-                            ],
+                            sections: sections.sort((a, b) => b.percent - a.percent),
                             additionalMaterials: []
                         });
                         setActiveTab("wizard");
