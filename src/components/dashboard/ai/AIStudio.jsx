@@ -277,7 +277,9 @@ const InventoryCheckBlock = ({ data, allIngredients, onAddIngredient, onDeleteIn
                                 <thead className="bg-slate-950 text-slate-500">
                                     <tr>
                                         <th className="px-4 py-3 font-bold uppercase tracking-wider">Bahan Baku</th>
+                                        <th className="px-4 py-3 font-bold uppercase tracking-wider">Kategori</th>
                                         <th className="px-4 py-3 font-bold uppercase tracking-wider">Status Stokcer</th>
+                                        <th className="px-4 py-3 font-bold uppercase tracking-wider text-center">Link</th>
                                         <th className="px-4 py-3 font-bold uppercase tracking-wider text-right">Aksi</th>
                                     </tr>
                                 </thead>
@@ -288,9 +290,28 @@ const InventoryCheckBlock = ({ data, allIngredients, onAddIngredient, onDeleteIn
                                             <tr key={idx} className="hover:bg-slate-800/30 transition-colors">
                                                 <td className="px-4 py-3 font-medium text-slate-200">{dbItem?.name || item.name}</td>
                                                 <td className="px-4 py-3">
+                                                    <span className="text-[10px] text-slate-400 bg-slate-800 px-2 py-0.5 rounded-full border border-slate-700">
+                                                        {dbItem?.category || '-'}
+                                                    </span>
+                                                </td>
+                                                <td className="px-4 py-3">
                                                     <Badge className="bg-emerald-500/10 text-emerald-500 border-none text-[9px] h-5">
                                                         <Check className="w-2 h-2 mr-1" /> Tersedia ({dbItem?.quantity || 0} {dbItem?.unit})
                                                     </Badge>
+                                                </td>
+                                                <td className="px-4 py-3 text-center">
+                                                    {dbItem?.purchase_url ? (
+                                                        <a 
+                                                            href={dbItem.purchase_url} 
+                                                            target="_blank" 
+                                                            rel="noopener noreferrer"
+                                                            className="text-indigo-400 hover:text-indigo-300 underline font-bold"
+                                                        >
+                                                            Beli
+                                                        </a>
+                                                    ) : (
+                                                        <span className="text-slate-600">-</span>
+                                                    )}
                                                 </td>
                                                 <td className="px-4 py-3 text-right">
                                                     <Button 
@@ -379,7 +400,7 @@ function AIStudio({ onNavigate }) {
     const fetchIngredients = async () => {
         try {
             const [ingRes, stockRes] = await Promise.all([
-                supabase.from('raw_materials').select('id, name, category, quantity, unit').eq('user_id', ownerId).is('deleted_at', null).order('name', { ascending: true }),
+                supabase.from('raw_materials').select('id, name, category, quantity, unit, purchase_url').eq('user_id', ownerId).is('deleted_at', null).order('name', { ascending: true }),
                 supabase.from('stocks').select('name, quantity, status').eq('user_id', ownerId).order('name', { ascending: true })
             ]);
             setAllIngredients(ingRes.data || []);
