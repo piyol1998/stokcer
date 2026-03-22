@@ -308,9 +308,19 @@ function RecipeGrid({ onUpdate }) {
                         // Two-pass approach to group AI components by category
                         // Pass 1: Match all components against DB and find the dominant category
                         const matchedComponents = (aiData.components || []).map(comp => {
-                            const match = (fetchedMaterials || []).find(m => 
-                                m.name.toLowerCase().trim() === comp.name?.toLowerCase().trim()
-                            );
+                            const aiName = (comp.name || '').toLowerCase().trim();
+                            
+                            // Smart match: check exact, then check if one contains the other (ignoring text in parentheses)
+                            const match = (fetchedMaterials || []).find(m => {
+                                const dbName = m.name.toLowerCase().trim();
+                                // Clean AI name from parentheses like "Lemon boost (citral)" -> "lemon boost"
+                                const aiNameClean = aiName.replace(/\s*\(.*\)\s*/g, '').trim();
+                                
+                                return dbName === aiName || 
+                                       dbName === aiNameClean || 
+                                       aiName.includes(dbName) || 
+                                       dbName.includes(aiNameClean);
+                            });
                             return { comp, match };
                         });
 
