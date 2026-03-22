@@ -303,16 +303,19 @@ function RecipeGrid({ onUpdate }) {
 
                         setGeneralInfo({ name: aiData.title || '', description: 'Hasil deteksi AI Studio Stokcer' });
                         
-                        // Group AI components by their actual category from the database
-                        const categoryGroups = {};
+                        // Group AI components by their actual category from the database (case-insensitive)
+                        const categoryGroups = {};       // key = UPPERCASE category, value = array of materials
+                        const categoryDisplayNames = {};  // key = UPPERCASE category, value = display name (original case)
                         (aiData.components || []).forEach(comp => {
                             const match = (fetchedMaterials || []).find(m => m.name.toLowerCase().trim() === comp.name?.toLowerCase().trim());
                             // Use the material's actual category from DB, default to 'Bibit' if not found
-                            const category = match?.category || 'Bibit';
-                            if (!categoryGroups[category]) {
-                                categoryGroups[category] = [];
+                            const rawCategory = match?.category || 'Bibit';
+                            const categoryKey = rawCategory.toUpperCase().trim(); // Normalize for grouping
+                            if (!categoryGroups[categoryKey]) {
+                                categoryGroups[categoryKey] = [];
+                                categoryDisplayNames[categoryKey] = rawCategory; // Keep first encountered case as display name
                             }
-                            categoryGroups[category].push({
+                            categoryGroups[categoryKey].push({
                                 id: match ? match.id : '',
                                 percent_share: comp.percentage || 0,
                                 _name: comp.name // Keep name for debugging
@@ -320,10 +323,12 @@ function RecipeGrid({ onUpdate }) {
                         });
 
                         // Build sections from category groups
-                        const sections = Object.entries(categoryGroups).map(([catName, materials], idx) => {
+                        const sections = Object.entries(categoryGroups).map(([catKey, materials], idx) => {
+                            // Use the display name (original case) for the section name
+                            const catName = categoryDisplayNames[catKey] || catKey;
                             const totalPercent = materials.reduce((sum, m) => sum + (parseFloat(m.percent_share) || 0), 0);
                             // Determine if this is a multi-material section
-                            const isMulti = materials.length > 1 || catName.toLowerCase().includes('bibit');
+                            const isMulti = materials.length > 1 || catKey.includes('BIBIT');
                             
                             if (isMulti) {
                                 // Recalculate percent_share relative to this section's total
