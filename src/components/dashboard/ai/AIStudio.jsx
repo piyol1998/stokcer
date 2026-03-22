@@ -49,9 +49,10 @@ const RecipeBlock = ({ data, allIngredients, onAddIngredient }) => {
     const [missingCategories, setMissingCategories] = useState({});
 
     const detectedIngredients = data.components.map(c => c.name);
-    const missing = detectedIngredients.filter(name => 
-        !allIngredients.some(item => item.name.toLowerCase() === name.toLowerCase())
-    );
+    const missing = detectedIngredients.filter(name => {
+        const cleanName = name.toLowerCase().trim();
+        return !allIngredients.some(item => item.name.toLowerCase().trim() === cleanName);
+    });
 
     const handleCategoryChange = (name, cat) => {
         setMissingCategories(prev => ({...prev, [name]: cat}));
@@ -134,7 +135,7 @@ const RecipeBlock = ({ data, allIngredients, onAddIngredient }) => {
                             </thead>
                             <tbody className="divide-y divide-slate-800">
                                 {data.components.map((comp, idx) => {
-                                    const exists = allIngredients.some(i => i.name.toLowerCase() === comp.name.toLowerCase());
+                                    const exists = allIngredients.some(i => i.name.toLowerCase().trim() === comp.name.toLowerCase().trim());
                                     return (
                                         <tr key={idx} className="hover:bg-slate-800/30 transition-colors">
                                             <td className="px-4 py-3 font-medium text-slate-200">{comp.name}</td>
@@ -328,7 +329,8 @@ ${allIngredients.length > 0 ? allIngredients.map(i => `- ${i.name} [${i.category
 
 ATURAN PENTING (CRITICAL):
 - Jika pengguna bertanya tentang data stok, produk, atau bahan baku, gunakan data di atas untuk menjawab dengan akurat.
-- If the user uploads an image of a perfume formulation, or explicitly asks you to parse a recipe, you MUST detect the components.
+- If the user uploads an image of a perfume formulation, or explicitly asks you to parse a recipe, you MUST detect all the components.
+- STRICT VOCABULARY MAPPING: When extracting the "name" of an ingredient for the JSON block, YOU MUST STRICTLY MATCH the name with one of the exact names from <DATA_BAHAN_BAKU> if it refers to the same material! For example, if the user's recipe says "Bergamot accord" or "Bergamot (citrus)", but the database only has "Bergamot", you MUST use EXACTLY "Bergamot" as the name in your JSON. Only use new names if the ingredient completely missing from the database.
 IMPORTANT: When you detect a recipe or formulation, you MUST format the recipe as a structured JSON block inside <RECIPE> tags like this:
 <RECIPE>
 {
