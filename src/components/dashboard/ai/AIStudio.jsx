@@ -183,6 +183,7 @@ function AIStudio() {
     const [imagePreview, setImagePreview] = useState(null);
     
     const [allIngredients, setAllIngredients] = useState([]);
+    const [dbStocks, setDbStocks] = useState([]);
     
     const fileInputRef = useRef(null);
     const chatEndRef = useRef(null);
@@ -226,13 +227,14 @@ function AIStudio() {
 
     const fetchIngredients = async () => {
         try {
-            const { data } = await supabase
-                .from('ingredients') 
-                .select('*')
-                .order('name', { ascending: true });
-            setAllIngredients(data || []);
+            const [ingRes, stockRes] = await Promise.all([
+                supabase.from('ingredients').select('name, category, total_stock, unit').order('name', { ascending: true }),
+                supabase.from('stocks').select('name, quantity, status').order('name', { ascending: true })
+            ]);
+            setAllIngredients(ingRes.data || []);
+            setDbStocks(stockRes.data || []);
         } catch (error) {
-            console.error("Fetch ingredients error:", error);
+            console.error("Fetch DB context error:", error);
         }
     };
 
@@ -313,8 +315,20 @@ function AIStudio() {
         setProcessing(true);
 
         const systemPrompt = `
-You are Cleith AI, an assistant for a perfume ingredient inventory system. You help the user manage their inventory, define recipes, and analyze notes.
-If the user uploads an image of a perfume formulation, or explicitly asks you to parse a recipe, you MUST detect the components.
+You are Cleith AI, an assistant for a perfume inventory system. You help the user manage their inventory, define recipes, and analyze notes. Use a professional and friendly Indonesian language.
+
+Here is the real-time actual database context you have access to right now:
+<DATA_PRODUK_JADI>
+${dbStocks.length > 0 ? dbStocks.map(s => `- ${s.name}: ${s.quantity} botol (Status: ${s.status || 'Ready'})`).join('\n') : "Belum ada produk jadi."}
+</DATA_PRODUK_JADI>
+
+<DATA_BAHAN_BAKU>
+${allIngredients.length > 0 ? allIngredients.map(i => `- ${i.name} [${i.category}]: ${i.total_stock || 0} ${i.unit || 'ml'}`).join('\n') : "Belum ada bahan baku."}
+</DATA_BAHAN_BAKU>
+
+ATURAN PENTING (CRITICAL):
+- Jika pengguna bertanya tentang data stok, produk, atau bahan baku, gunakan data di atas untuk menjawab dengan akurat.
+- If the user uploads an image of a perfume formulation, or explicitly asks you to parse a recipe, you MUST detect the components.
 IMPORTANT: When you detect a recipe or formulation, you MUST format the recipe as a structured JSON block inside <RECIPE> tags like this:
 <RECIPE>
 {
