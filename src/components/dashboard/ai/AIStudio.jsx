@@ -125,7 +125,18 @@ function AIStudio() {
         setProcessing(true);
         try {
             const genAI = new GoogleGenerativeAI(apiKey);
-            const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+            
+            // Try different models until one succeeds
+            const modelsToTry = [
+                "gemini-1.5-flash", 
+                "gemini-1.5-pro",
+                "gemini-1.5-flash-latest",
+                "gemini-pro-vision"
+            ];
+            
+            let result = null;
+            let lastError = null;
+            const imagePart = await fileToGenerativePart(image);
 
             const prompt = `
                 Analyze this perfume composition image. 
@@ -141,8 +152,26 @@ function AIStudio() {
                 Wait! Only return the JSON. No other text.
             `;
 
-            const imagePart = await fileToGenerativePart(image);
-            const result = await model.generateContent([prompt, imagePart]);
+            for (const modelName of modelsToTry) {
+                try {
+                    console.log("Trying Gemini model:", modelName);
+                    const model = genAI.getGenerativeModel({ model: modelName });
+                    result = await model.generateContent([prompt, imagePart]);
+                    break; // Success! Break the loop
+                } catch (err) {
+                    console.warn(`Model ${modelName} failed:`, err.message);
+                    lastError = err;
+                    // If it's a 404, we continue to the next model. Otherwise, we might want to throw.
+                    if (!err.message.includes('404')) {
+                        throw err; // e.g. Invalid API Key should not retry
+                    }
+                }
+            }
+
+            if (!result) {
+                throw lastError || new Error("Failed to generate content with any available model.");
+            }
+
             const responseText = result.response.text();
             
             // Clean JSON string if wrapped in markdown
