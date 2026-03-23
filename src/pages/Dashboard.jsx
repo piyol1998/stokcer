@@ -12,6 +12,7 @@ import PremiumLock from '@/components/dashboard/PremiumLock'; // New Lock Compon
 import AIStudio from '@/components/dashboard/ai/AIStudio';
 import { useAuth } from '@/contexts/SupabaseAuthContext';
 import { useSubscription } from '@/hooks/useSubscription';
+import { useToast } from '@/components/ui/use-toast';
 import { Menu, Package, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -23,11 +24,30 @@ const LoadingSpinner = () => (
 );
 
 function Dashboard() {
-  const { user } = useAuth();
+  const { user, ownerId } = useAuth();
   const { loading: subLoading, isTrialExpired } = useSubscription();
+  const { toast } = useToast();
+  const location = useLocation();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [inventoryInitialTab, setInventoryInitialTab] = useState('materials');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  useEffect(() => {
+    // Detect TikTok/Shopee Authorization Redirect
+    const params = new URLSearchParams(location.search);
+    const code = params.get('code');
+    const state = params.get('state');
+
+    if (code && state === 'stokcer_auth') {
+      setActiveTab('marketplace');
+      toast({
+        title: "Otorisasi Berhasil",
+        description: "Menyambungkan akun TikTok Anda... Mohon tunggu proses sinkronisasi.",
+      });
+      // Optionally clear the query params to prevent re-triggering
+      window.history.replaceState({}, document.title, "/dashboard");
+    }
+  }, [location, toast]);
 
   const goToInventory = (tab = 'materials') => {
     setInventoryInitialTab(tab);

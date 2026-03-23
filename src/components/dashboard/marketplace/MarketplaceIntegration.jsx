@@ -252,8 +252,9 @@ function MarketplaceIntegration() {
         }
     };
 
+    const redirectUri = typeof window !== 'undefined' ? `${window.location.origin}/dashboard` : '';
     const authUrl = tiktokCreds.appKey 
-        ? `https://auth.tiktok-shops.com/oauth/authorize?app_key=${tiktokCreds.appKey}&state=stokcer_auth`
+        ? `https://auth.tiktok-shops.com/oauth/authorize?app_key=${tiktokCreds.appKey}&state=stokcer_auth&redirect_uri=${encodeURIComponent(redirectUri)}`
         : '#';
 
     if (loading) {
