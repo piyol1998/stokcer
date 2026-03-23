@@ -39,15 +39,44 @@ function Dashboard() {
     const state = params.get('state');
 
     if (code && state === 'stokcer_auth') {
-      setActiveTab('marketplace');
-      toast({
-        title: "Otorisasi Berhasil",
-        description: "Menyambungkan akun TikTok Anda... Mohon tunggu proses sinkronisasi.",
-      });
-      // Optionally clear the query params to prevent re-triggering
-      window.history.replaceState({}, document.title, "/dashboard");
+      const handleTiktokAuth = async () => {
+        setActiveTab('marketplace');
+        toast({
+          title: "Menyambungkan...",
+          description: "Sedang menukarkan kode akses TikTok... Mohon tunggu.",
+        });
+
+        try {
+          const { data, error } = await supabase.functions.invoke('marketplace-sync', {
+            body: { 
+              action: 'exchange_tiktok_token', 
+              code: code,
+              userId: ownerId 
+            }
+          });
+
+          if (error) throw error;
+          if (data?.success) {
+            toast({
+              title: "Tersambung!",
+              description: `Berhasil tersambung ke toko ${data.shop_name || 'TikTok Shop'}.`,
+            });
+          }
+        } catch (err) {
+          console.error("TikTok Auth Error:", err);
+          toast({
+            title: "Gagal Menyambung",
+            description: "Gagal menukarkan kode akses. Pastikan credentials Anda benar.",
+            variant: "destructive"
+          });
+        } finally {
+          window.history.replaceState({}, document.title, "/dashboard");
+        }
+      };
+
+      handleTiktokAuth();
     }
-  }, [location, toast]);
+  }, [location, toast, ownerId]);
 
   const goToInventory = (tab = 'materials') => {
     setInventoryInitialTab(tab);
