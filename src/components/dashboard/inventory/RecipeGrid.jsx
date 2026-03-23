@@ -356,22 +356,50 @@ function RecipeGrid({ onUpdate }) {
                             return { comp, match };
                         });
 
-                        // Pass 2: Create ONE section per Component (Sama Persis Mode)
-                        const sections = (aiData.components || []).map((comp, idx) => {
-                            const aiName = (comp.name || '').trim();
-                            let match = (fetchedMaterials || []).find(m => m.id === comp.materialId || m.id === comp.matchedId);
-                            if (!match) match = (fetchedMaterials || []).find(m => isSimilar(m.name, aiName));
-
-                            const finalCategory = match ? match.category : (comp.category || comp.matchedCategory || 'Material sintetik');
+                        // Pass 2: Group components with a cleaner, more unified logic
+                        const groups = {};
+                        (aiData.components || []).forEach(comp => {
+                            const match = (fetchedMaterials || []).find(m => isSimilar(m.name, comp.name));
+                            const cat = (match ? match.category : (comp.category || 'Material sintetik')).trim();
+                            const catKey = cat.toUpperCase();
                             
-                            return {
-                                id: `sec-ai-${idx}-${Date.now()}`,
-                                name: finalCategory,
-                                percent: Math.round((comp.percentage || 0) * 100) / 100,
-                                type: 'single',
-                                materialId: match ? match.id : '',
-                                materials: [] 
-                            };
+                            if (!groups[catKey]) groups[catKey] = { name: cat, items: [] };
+                            groups[catKey].items.push({
+                                id: match ? match.id : '',
+                                name: match ? match.name : comp.name,
+                                percent_share: Number(comp.percentage) || 0
+                            });
+                        });
+
+                        // Pass 3: Convert Groups to Unified Sections
+                        const sections = Object.values(groups).map((group, idx) => {
+                            const sectionTotal = group.items.reduce((s, i) => s + i.percent_share, 0);
+                            const isGroupSection = group.items.length > 1 || 
+                                           group.name.toLowerCase().includes('material sintetik') || 
+                                           group.name.toLowerCase().includes('bibit') ||
+                                           group.name.toLowerCase().includes('accord');
+
+                            if (isGroupSection) {
+                                return {
+                                    id: `sec-ai-${idx}-${Date.now()}`,
+                                    name: group.name,
+                                    percent: Math.round(sectionTotal * 100) / 100,
+                                    type: 'multi',
+                                    materials: group.items.map(item => ({
+                                        id: item.id,
+                                        percent_share: sectionTotal > 0 ? (item.percent_share / sectionTotal) * 100 : 0
+                                    }))
+                                };
+                            } else {
+                                return {
+                                    id: `sec-ai-${idx}-${Date.now()}`,
+                                    name: group.name,
+                                    percent: Math.round(sectionTotal * 100) / 100,
+                                    type: 'single',
+                                    materialId: group.items[0]?.id || '',
+                                    materials: []
+                                };
+                            }
                         });
 
                         setWizardData({
