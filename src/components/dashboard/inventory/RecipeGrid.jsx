@@ -360,8 +360,8 @@ function RecipeGrid({ onUpdate }) {
                         const groups = {};
                         (aiData.components || []).forEach(comp => {
                             const match = (fetchedMaterials || []).find(m => isSimilar(m.name, comp.name));
-                            // PRIORITASKAN PILIHAN AI STUDIO (comp.category) SESUAI REQUEST USER
-                            const cat = (comp.category || (match ? match.category : 'Material sintetik')).trim();
+                            // SUMBER KEBENARAN UTAMA: DATABASE STOKCER
+                            const cat = (match ? match.category : (comp.category || 'Material sintetik')).trim();
                             const catKey = cat.toUpperCase();
                             
                             if (!groups[catKey]) groups[catKey] = { name: cat, items: [] };
