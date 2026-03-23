@@ -1,5 +1,6 @@
 import React, { useState, useEffect, Suspense } from 'react';
 import { Helmet } from 'react-helmet';
+import { useLocation } from 'react-router-dom';
 import Sidebar from '@/components/dashboard/Sidebar';
 import DashboardStock from '@/components/dashboard/DashboardStock';
 import InventoryManagement from '@/components/dashboard/InventoryManagement';
