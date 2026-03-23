@@ -21,6 +21,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Badge } from '@/components/ui/badge';
+import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { 
     Select, 
@@ -407,9 +408,41 @@ Jika user upload stok gudang:
                 <div ref={chatEndRef} />
             </div>
             <div className="shrink-0 max-w-5xl mx-auto w-full pb-8 px-2">
-                <form onSubmit={handleSubmit} className="relative"><div className="flex items-center gap-3 bg-[#0f172a] border border-white/10 rounded-[2rem] p-3 pl-5 pr-3 shadow-3xl focus-within:border-indigo-500/50 transition-all duration-300"><Button type="button" variant="ghost" size="icon" onClick={() => fileInputRef.current?.click()} className="text-slate-500 hover:text-indigo-400 hover:bg-slate-800 transition-all rounded-2xl w-12 h-12"><Plus className="w-7 h-7" /></Button><input type="file" ref={fileInputRef} onChange={(e) => { const file = e.target.files?.[0]; if (file) { const reader = new FileReader(); reader.onloadend = () => setImages([{ file, preview: reader.result }]); reader.readAsDataURL(file); } }} className="hidden" accept="image/*" />
-                <Input value={inputText} onChange={(e) => setInputText(e.target.value)} placeholder="Tanya tentang modal atau input formula baru..." className="bg-transparent border-none focus-visible:ring-0 text-white h-12 text-sm placeholder:text-slate-600 font-medium" />
-                <Button type="submit" disabled={processing || (!inputText.trim() && images.length === 0)} className="bg-indigo-600 hover:bg-indigo-500 shadow-indigo-900/50 shrink-0 w-12 h-12 rounded-2xl transition-all active:scale-95"><ArrowUp className="w-6 h-6 text-white" /></Button></div></form>
+                <form onSubmit={handleSubmit} className="relative">
+                    <div className="flex items-end gap-3 bg-[#0f172a] border border-white/10 rounded-[1.5rem] p-3 pl-5 pr-3 shadow-3xl focus-within:border-indigo-500/50 transition-all duration-300">
+                        <Button 
+                            type="button" 
+                            variant="ghost" 
+                            size="icon" 
+                            onClick={() => fileInputRef.current?.click()} 
+                            className="text-slate-500 hover:text-indigo-400 hover:bg-slate-800 transition-all rounded-2xl w-12 h-12 mb-0.5"
+                        >
+                            <Plus className="w-7 h-7" />
+                        </Button>
+                        <input type="file" ref={fileInputRef} onChange={(e) => { const file = e.target.files?.[0]; if (file) { const reader = new FileReader(); reader.onloadend = () => setImages([{ file, preview: reader.result }]); reader.readAsDataURL(file); } }} className="hidden" accept="image/*" />
+                        
+                        <Textarea 
+                            value={inputText} 
+                            onChange={(e) => setInputText(e.target.value)} 
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter' && !e.shiftKey) {
+                                    e.preventDefault();
+                                    handleSubmit(e);
+                                }
+                            }}
+                            placeholder="Tanya tentang modal atau ketik komposisi formula lengkap ke sini..." 
+                            className="bg-transparent border-none focus-visible:ring-0 text-white min-h-[120px] text-sm placeholder:text-slate-600 font-medium resize-none custom-scrollbar py-3" 
+                        />
+
+                        <Button 
+                            type="submit" 
+                            disabled={processing || (!inputText.trim() && images.length === 0)} 
+                            className="bg-indigo-600 hover:bg-indigo-500 shadow-indigo-900/50 shrink-0 w-12 h-12 rounded-2xl transition-all active:scale-95 mb-0.5"
+                        >
+                            <ArrowUp className="w-6 h-6 text-white" />
+                        </Button>
+                    </div>
+                </form>
             </div>
         </div>
     );
