@@ -7,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/SupabaseAuthContext';
 import { useToast } from '@/components/ui/use-toast';
 import { useSubscription } from '@/hooks/useSubscription';
-import { Store, Globe, User, CreditCard, Zap, BadgeCheck, AlertTriangle, Trash2, Users, Ticket, Loader2, Bell, Send } from 'lucide-react';
+import { Store, User, CreditCard, Zap, BadgeCheck, AlertTriangle, Trash2, Users, Ticket, Loader2, Bell, Send } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from '@/components/ui/dialog';
 import { supabase } from '@/lib/customSupabaseClient';
@@ -241,7 +241,6 @@ function SettingsPage() {
                {!isStaff && (
                  <TabsTrigger value="subscription" className="data-[state=active]:bg-indigo-600 text-slate-400 data-[state=active]:text-white"><CreditCard className="w-4 h-4 mr-2" /> Subscription</TabsTrigger>
                )}
-               <TabsTrigger value="online-store" className="data-[state=active]:bg-indigo-600 text-slate-400 data-[state=active]:text-white"><Globe className="w-4 h-4 mr-2" /> Online Store</TabsTrigger>
                <TabsTrigger value="notifications" className="data-[state=active]:bg-indigo-600 text-slate-400 data-[state=active]:text-white"><Bell className="w-4 h-4 mr-2" /> Notifications</TabsTrigger>
                <TabsTrigger value="account" className="data-[state=active]:bg-indigo-600 text-slate-400 data-[state=active]:text-white"><User className="w-4 h-4 mr-2" /> Account</TabsTrigger>
            </TabsList>
@@ -288,15 +287,6 @@ function SettingsPage() {
                  </div>
              </TabsContent>
            )}
-
-           <TabsContent value="online-store" className="space-y-6">
-                <div className="bg-[#1e293b] p-6 rounded-xl border border-slate-700">
-                    <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2"><Globe className="w-5 h-5 text-indigo-400" /> Online Store Integration</h2>
-                    <div className="p-4 bg-indigo-900/20 border border-indigo-500/20 rounded-lg">
-                        <p className="text-sm text-indigo-300">Automatic sync allows you to manage inventory in one place.</p>
-                    </div>
-                </div>
-            </TabsContent>
 
             <TabsContent value="notifications" className="space-y-6">
                 <div className="bg-[#1e293b] p-6 rounded-xl border border-slate-700">

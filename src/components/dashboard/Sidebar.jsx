@@ -23,11 +23,6 @@ function Sidebar({ activeTab, setActiveTab, user, isMobileOpen, setIsMobileOpen 
     },
     { id: 'inventory', label: 'Stok & Produksi', icon: Box },
     { 
-        id: 'marketplace', 
-        label: 'Integrasi Toko', 
-        icon: ShoppingBag 
-    },
-    { 
         id: 'ai-studio', 
         label: 'AI Studio Cleith', 
         icon: BrainCircuit,
