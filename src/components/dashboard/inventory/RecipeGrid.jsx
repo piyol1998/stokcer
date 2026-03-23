@@ -359,15 +359,15 @@ function RecipeGrid({ onUpdate }) {
                         // Pass 2: Group components with a cleaner, more unified logic
                         const groups = {};
                         (aiData.components || []).forEach(comp => {
-                            const match = (fetchedMaterials || []).find(m => isSimilar(m.name, comp.name));
-                            // SUMBER KEBENARAN UTAMA: DATABASE STOKCER
-                            const cat = (match ? match.category : (comp.category || 'Material sintetik')).trim();
+                            // PRIORITASKAN DATA DARI AI STUDIO (KARENA SUDAH DIVALIDASI DATABASE DI SANA)
+                            const cat = (comp.category || 'Material sintetik').trim();
+                            const match = (fetchedMaterials || []).find(m => m.id === comp.materialId || isSimilar(m.name, comp.name));
                             const catKey = cat.toUpperCase();
                             
                             if (!groups[catKey]) groups[catKey] = { name: cat, items: [] };
                             groups[catKey].items.push({
-                                id: match ? match.id : '',
-                                name: match ? match.name : comp.name,
+                                id: match ? match.id : (comp.materialId || ''),
+                                name: comp.name,
                                 percent_share: Number(comp.percentage) || 0
                             });
                         });
