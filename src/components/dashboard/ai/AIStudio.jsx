@@ -222,9 +222,18 @@ function AIStudio({ onNavigate }) {
     const [dbStats, setDbStats] = useState({ totalModalDikeluarkan: 0, sisaModalBahan: 0, totalProductionCost: 0, totalBatches: 0, totalSales: 0 });
     const fileInputRef = useRef(null);
     const chatEndRef = useRef(null);
+    const textareaRef = useRef(null);
 
     useEffect(() => { if (ownerId) { fetchSettings(); fetchDataContext(); } }, [ownerId]);
     useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, processing]);
+    
+    useEffect(() => {
+        if (textareaRef.current) {
+            textareaRef.current.style.height = '55px';
+            const scrollHeight = textareaRef.current.scrollHeight;
+            textareaRef.current.style.height = Math.min(Math.max(scrollHeight, 55), 120) + 'px';
+        }
+    }, [inputText]);
 
     const fetchSettings = async () => {
         try {
@@ -409,19 +418,20 @@ Jika user upload stok gudang:
             </div>
             <div className="shrink-0 max-w-5xl mx-auto w-full pb-8 px-2">
                 <form onSubmit={handleSubmit} className="relative">
-                    <div className="flex items-end gap-3 bg-[#0f172a] border border-white/10 rounded-[1.5rem] p-3 pl-5 pr-3 shadow-3xl focus-within:border-indigo-500/50 transition-all duration-300">
+                    <div className="flex items-center gap-3 bg-[#0f172a] border border-white/10 rounded-[1.5rem] p-2 pl-4 pr-2 shadow-3xl focus-within:border-indigo-500/50 transition-all duration-300">
                         <Button 
                             type="button" 
                             variant="ghost" 
                             size="icon" 
                             onClick={() => fileInputRef.current?.click()} 
-                            className="text-slate-500 hover:text-indigo-400 hover:bg-slate-800 transition-all rounded-2xl w-12 h-12 mb-0.5"
+                            className="text-slate-500 hover:text-indigo-400 hover:bg-slate-800 transition-all rounded-xl w-10 h-10"
                         >
-                            <Plus className="w-7 h-7" />
+                            <Plus className="w-6 h-6" />
                         </Button>
                         <input type="file" ref={fileInputRef} onChange={(e) => { const file = e.target.files?.[0]; if (file) { const reader = new FileReader(); reader.onloadend = () => setImages([{ file, preview: reader.result }]); reader.readAsDataURL(file); } }} className="hidden" accept="image/*" />
                         
                         <Textarea 
+                            ref={textareaRef}
                             value={inputText} 
                             onChange={(e) => setInputText(e.target.value)} 
                             onKeyDown={(e) => {
@@ -431,15 +441,15 @@ Jika user upload stok gudang:
                                 }
                             }}
                             placeholder="Tanya tentang modal atau ketik komposisi formula lengkap ke sini..." 
-                            className="bg-transparent border-none focus-visible:ring-0 text-white min-h-[120px] text-sm placeholder:text-slate-600 font-medium resize-none custom-scrollbar py-3" 
+                            className="bg-transparent border-none focus-visible:ring-0 text-white min-h-[55px] max-h-[120px] text-sm placeholder:text-slate-600 font-medium resize-none custom-scrollbar py-4 leading-relaxed overflow-y-auto" 
                         />
 
                         <Button 
                             type="submit" 
                             disabled={processing || (!inputText.trim() && images.length === 0)} 
-                            className="bg-indigo-600 hover:bg-indigo-500 shadow-indigo-900/50 shrink-0 w-12 h-12 rounded-2xl transition-all active:scale-95 mb-0.5"
+                            className="bg-indigo-600 hover:bg-indigo-500 shadow-indigo-900/50 shrink-0 w-10 h-10 rounded-xl transition-all active:scale-95"
                         >
-                            <ArrowUp className="w-6 h-6 text-white" />
+                            <ArrowUp className="w-5 h-5 text-white" />
                         </Button>
                     </div>
                 </form>
