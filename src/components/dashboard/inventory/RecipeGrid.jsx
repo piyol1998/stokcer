@@ -356,59 +356,22 @@ function RecipeGrid({ onUpdate }) {
                             return { comp, match };
                         });
 
-                        // Pass 2: Group components BY THEIR ACTUAL CATEGORY
-                        const categoryGroups = {};
-                        const categoryDisplayNames = {};
-                        
-                        matchedComponents.forEach(({ comp, match }) => {
-                            // PRIORITY: Database Category > AI Suggested Category > Fallback
-                            const finalCategory = match ? match.category : (comp.category || comp.matchedCategory || 'Material sintetik');
-                            const categoryKey = finalCategory.toUpperCase().trim();
-                            
-                            if (!categoryGroups[categoryKey]) {
-                                categoryGroups[categoryKey] = [];
-                                categoryDisplayNames[categoryKey] = finalCategory;
-                            }
-                            
-                            categoryGroups[categoryKey].push({
-                                id: match ? match.id : '',
-                                percent_share: comp.percentage || 0,
-                                name: match ? match.name : comp.name 
-                            });
-                        });
+                        // Pass 2: Create ONE section per Component (Sama Persis Mode)
+                        const sections = (aiData.components || []).map((comp, idx) => {
+                            const aiName = (comp.name || '').trim();
+                            let match = (fetchedMaterials || []).find(m => m.id === comp.materialId || m.id === comp.matchedId);
+                            if (!match) match = (fetchedMaterials || []).find(m => isSimilar(m.name, aiName));
 
-                        // Pass 3: Convert Groups to Wizard Sections
-                        const sections = Object.entries(categoryGroups).map(([catKey, items], idx) => {
-                            const catName = categoryDisplayNames[catKey];
-                            const sectionTotalPercent = items.reduce((sum, item) => sum + (parseFloat(item.percent_share) || 0), 0);
+                            const finalCategory = match ? match.category : (comp.category || comp.matchedCategory || 'Material sintetik');
                             
-                            // Decide type: Section with multiple items is 'multi', otherwise check if it's naturally a multi-group (like Bibit)
-                            const isMulti = items.length > 1 || catName.toLowerCase().includes('bibit') || catName.toLowerCase().includes('material sintetik');
-                            
-                            if (isMulti) {
-                                return {
-                                    id: `sec-ai-${idx}-${Date.now()}`,
-                                    name: catName,
-                                    percent: Math.round(sectionTotalPercent * 100) / 100,
-                                    type: 'multi',
-                                    materials: items.map(item => ({
-                                        id: item.id,
-                                        // Calculate share inside the section
-                                        percent_share: sectionTotalPercent > 0 
-                                            ? Math.round((item.percent_share / sectionTotalPercent) * 100 * 100) / 100 
-                                            : 0
-                                    }))
-                                };
-                            } else {
-                                return {
-                                    id: `sec-ai-${idx}-${Date.now()}`,
-                                    name: catName,
-                                    percent: Math.round(sectionTotalPercent * 100) / 100,
-                                    type: 'single',
-                                    materialId: items[0]?.id || '',
-                                    materials: []
-                                };
-                            }
+                            return {
+                                id: `sec-ai-${idx}-${Date.now()}`,
+                                name: finalCategory,
+                                percent: Math.round((comp.percentage || 0) * 100) / 100,
+                                type: 'single',
+                                materialId: match ? match.id : '',
+                                materials: [] 
+                            };
                         });
 
                         setWizardData({
