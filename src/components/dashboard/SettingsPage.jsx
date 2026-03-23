@@ -372,7 +372,7 @@ function SettingsPage() {
                            </div>
                            
                            <Button onClick={handleJoinTeam} className="bg-indigo-600 hover:bg-indigo-500 text-white whitespace-nowrap">
-                               Gunankan Kode
+                               Gunakan Kode
                            </Button>
 
                            <Dialog open={showJoinConfirm} onOpenChange={setShowJoinConfirm}>
