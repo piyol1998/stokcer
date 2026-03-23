@@ -82,8 +82,8 @@ const RecipeBlock = ({ data, allIngredients, onAddIngredient, onNavigate }) => {
                     ...c,
                     // Use exact ID from database for proper linking
                     materialId: match?.id,
-                    // Ensure category matches exactly what's in the DB
-                    category: match ? match.category : (c.category || defaultCat),
+                    // PRIORITASKAN PILIHAN AI (c.category) SESUAI REQUEST USER
+                    category: c.category || (match ? match.category : defaultCat),
                     // Send exact percentage from AI
                     percentage: Number(c.percentage)
                 };
