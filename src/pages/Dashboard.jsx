@@ -1,4 +1,4 @@
-import React, { useState, useEffect, Suspense } from 'react';
+import React, { useState, useEffect, Suspense, useRef } from 'react';
 import { Helmet } from 'react-helmet';
 import { useLocation } from 'react-router-dom';
 import Sidebar from '@/components/dashboard/Sidebar';
@@ -9,11 +9,12 @@ import EmployeeManagement from '@/components/dashboard/inventory/EmployeeManagem
 import MarketplaceIntegration from '@/components/dashboard/marketplace/MarketplaceIntegration';
 import AiAdvertising from '@/components/dashboard/AiAdvertising';
 import TrialBanner from '@/components/dashboard/TrialBanner';
-import PremiumLock from '@/components/dashboard/PremiumLock'; // New Lock Component
+import PremiumLock from '@/components/dashboard/PremiumLock';
 import AIStudio from '@/components/dashboard/ai/AIStudio';
 import { useAuth } from '@/contexts/SupabaseAuthContext';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useToast } from '@/components/ui/use-toast';
+import { supabase } from '@/lib/customSupabaseClient';
 import { Menu, Package, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -32,6 +33,9 @@ function Dashboard() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [inventoryInitialTab, setInventoryInitialTab] = useState('materials');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  // Key to force re-mount MarketplaceIntegration after successful TikTok auth
+  const [marketplaceKey, setMarketplaceKey] = useState(0);
+  const handledCode = useRef(null);
 
   useEffect(() => {
     // Detect TikTok/Shopee Authorization Redirect
@@ -39,12 +43,15 @@ function Dashboard() {
     const code = params.get('code');
     const state = params.get('state');
 
-    if (code && state === 'stokcer_auth') {
+    // Guard: only process each unique code once
+    if (code && state === 'stokcer_auth' && handledCode.current !== code) {
+      handledCode.current = code;
+
       const handleTiktokAuth = async () => {
         setActiveTab('marketplace');
         toast({
-          title: "Menyambungkan...",
-          description: "Sedang menukarkan kode akses TikTok... Mohon tunggu.",
+          title: "🔄 Menyambungkan TikTok Shop...",
+          description: "Sedang menukarkan kode otorisasi. Mohon tunggu sebentar.",
         });
 
         try {
@@ -56,26 +63,32 @@ function Dashboard() {
             }
           });
 
-          if (error) throw error;
+          if (error) throw new Error(error.message || 'Supabase function error');
+          
           if (data?.success) {
             toast({
-              title: "Tersambung!",
-              description: `Berhasil tersambung ke toko ${data.shop_name || 'TikTok Shop'}.`,
+              title: "✅ Berhasil Tersambung!",
+              description: `Toko "${data.shop_name || 'TikTok Shop'}" kini terhubung ke Stokcer.`,
             });
+            // Force MarketplaceIntegration re-fetch settings to show CONNECTED
+            setMarketplaceKey(k => k + 1);
+          } else {
+            throw new Error(data?.error || 'Token exchange failed');
           }
         } catch (err) {
           console.error("TikTok Auth Error:", err);
           toast({
-            title: "Gagal Menyambung",
-            description: "Gagal menukarkan kode akses. Pastikan credentials Anda benar.",
+            title: "❌ Gagal Menyambung",
+            description: err.message || "Gagal menukarkan kode akses. Pastikan App Key & Secret sudah benar.",
             variant: "destructive"
           });
         } finally {
+          // Clean URL agar code tidak diproses ulang saat render
           window.history.replaceState({}, document.title, "/dashboard");
         }
       };
 
-      handleTiktokAuth();
+      if (ownerId) handleTiktokAuth();
     }
   }, [location, toast, ownerId]);
 
@@ -116,7 +129,7 @@ function Dashboard() {
         case 'ai-studio':
           return <AIStudio onNavigate={goToInventory} />;
         case 'marketplace':
-          return <MarketplaceIntegration />;
+          return <MarketplaceIntegration key={marketplaceKey} />;
         case 'settings':
           return <SettingsPage />;
         default:
